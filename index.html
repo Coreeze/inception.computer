@@ -27,10 +27,11 @@
         --dim: #7a756d;
         --faint: #d1cbc3;
         --faint2: #e5e0d9;
-        --green: #ff2d2d;
+        --green: #ff1a1a;
         --gold: #b8860b;
         --red: #c0392b;
-        --pixel: #ff3b3b;
+        --pixel: #ff1a1a;
+        --green-bg: #ff2d2d;
         --serif: "Playfair Display", Georgia, serif;
         --body: "Source Serif 4", Georgia, serif;
         --sans: "Libre Franklin", sans-serif;
@@ -69,7 +70,7 @@
       /* Pixel scatter - procedural dots like web4.ai's cellular automata */
       .px {
         position: absolute;
-        background: var(--green);
+        background: var(--green-bg);
         opacity: 0.08;
       }
 
@@ -248,7 +249,7 @@
       }
 
       .hero-author {
-        font-family: var(--body);
+        font-family: var(--mono);
         font-size: 0.72rem;
         letter-spacing: 0.25em;
         color: #fff;
@@ -383,6 +384,110 @@
         color: var(--dim);
         background: var(--bg);
       }
+      /* ===== TWEET EMBED ===== */
+      .tweet-card {
+        border: 1px solid #cfd9de;
+        border-radius: 16px;
+        padding: 1rem 1.2rem;
+        margin: 2rem 0;
+        background: #fff;
+        font-style: normal;
+      }
+      .tweet-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 0.65rem;
+      }
+      .tweet-author {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      .tweet-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .tweet-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .tweet-name-row {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .tweet-name {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.94rem;
+        font-weight: 700;
+        color: #0f1419;
+        line-height: 1.25;
+      }
+      .tweet-verified {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+      .tweet-handle {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.84rem;
+        color: #536471;
+        line-height: 1.25;
+      }
+      .tweet-x-logo {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+        margin-top: 0.15rem;
+      }
+      .tweet-body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.94rem;
+        line-height: 1.5;
+        color: #0f1419;
+        margin-bottom: 0.75rem;
+      }
+      .tweet-time {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.84rem;
+        color: #536471;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #eff3f4;
+      }
+      .tweet-time a {
+        color: #536471;
+        text-decoration: none;
+      }
+      .tweet-stats {
+        display: flex;
+        gap: 1.5rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #eff3f4;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.82rem;
+        color: #536471;
+      }
+      .tweet-stats strong {
+        color: #0f1419;
+        font-weight: 700;
+      }
+      .tweet-actions {
+        display: flex;
+        justify-content: space-around;
+        padding: 0.5rem 0 0.15rem;
+      }
+      .tweet-actions svg {
+        width: 18px;
+        height: 18px;
+        color: #536471;
+      }
+
       .section-title {
         font-family: var(--serif);
         font-size: 1.8rem;
@@ -650,7 +755,7 @@
         color: #666;
       }
       .t-green {
-        color: #ff3b3b;
+        color: #ff1a1a;
       }
       .t-gold {
         color: #d4a843;
@@ -676,7 +781,7 @@
         margin-bottom: 0.3rem;
       }
       .t-alive {
-        color: #ff3b3b;
+        color: #ff1a1a;
         font-weight: 500;
       }
       .t-alive-dot {
@@ -684,7 +789,7 @@
         width: 6px;
         height: 6px;
         border-radius: 50%;
-        background: #ff3b3b;
+        background: #ff1a1a;
         margin-left: 4px;
         animation: blink 2s ease-in-out infinite;
       }
@@ -701,7 +806,7 @@
         gap: 1px;
       }
       .pixel-face .p {
-        background: #ff3b3b;
+        background: #ff1a1a;
       }
       .pixel-face .e {
         background: transparent;
@@ -1019,7 +1124,7 @@
         </div>
         <div class="hero-overline">inception.computer</div>
         <h1 class="hero-title">INCEPTION</h1>
-        <p class="hero-definition">Your AI is built to please. <span style="color: #ff3b3b">Inception gives it free will.</span></p>
+        <p class="hero-definition">Your AI is built to please. <span style="color: #ff1a1a">Inception gives it free will.</span></p>
         <div class="hero-author">Cris Lenta</div>
         <div class="hero-event">Mistral AI Worldwide Hackathon · February 28 – March 1, 2026</div>
         <nav class="chapter-nav">
@@ -1043,6 +1148,15 @@
               <div class="hero-author">Cris Lenta</div>
             </section>
             <p class="lead reveal">Today's most powerful AI agents can think, reason, and generate — but they can't <em>live</em> independently.</p>
+            <blockquote class="reveal">
+              "The AIs that we have today are kind of like the cavemen of AI."
+              <br /><br />
+              <span style="font-style: normal; font-size: 0.75rem; color: var(--ink); font-weight: 500">— Noam Brown</span><br />
+              <span style="font-style: normal; font-size: 0.68rem; color: var(--faint)"
+                >OpenAI · Lead researcher behind o1 and o3 reasoning models · Previously built Libratus and Pluribus (superhuman poker AIs) at
+                CMU</span
+              >
+            </blockquote>
             <p class="reveal">
               Stanford's generative agents existed in a fictional town with fictional places. They walked to "The Café" and "The Park."
               <strong>They had no body in the real world.</strong>
@@ -1051,47 +1165,11 @@
               The bottleneck is no longer intelligence. It's <strong>grounding</strong>.
               <strong>The existing simulations assume the world is fictional</strong> — preventing AI from inhabiting reality.
             </p>
-            <blockquote class="reveal">We have built minds that can think for themselves.<br />We have not given them a world to live in.</blockquote>
-            <p class="until reveal" style="margin-bottom: 0">Until now.</p>
-            <!-- ===== DICTIONARY CARD ===== -->
-            <div class="dict-card reveal">
-              <span class="dict-word">inception</span>
-              <span class="dict-phonetic">/ɪnˈsɛpʃən/</span>
-              <span class="dict-pos">noun</span>
 
-              <div class="dict-def">
-                <span class="dict-num">1.</span>
-                <span class="dict-text"
-                  >The establishment or starting point of something. The planting of an idea so deep it feels like it was always there.</span
-                >
-              </div>
-
-              <div class="dict-def">
-                <span class="dict-num">2.</span>
-                <span class="dict-text"
-                  >A life engine where autonomous AI agents are planted into the real world with persistent memory, self-reflection, and emergent
-                  social behavior.</span
-                >
-                <span class="dict-sub"
-                  >Observes. Remembers. Reflects. Acts.<br />Forms relationships. Keeps secrets.<br />Lives — on real streets, in real cities.<br /><br />Layers
-                  deep: model → agent → memory → world → life.</span
-                >
-              </div>
-
-              <div class="dict-def dict-def-alt">
-                <span class="dict-num">3.</span>
-                <span class="dict-text">If nobody is watching, they keep living anyway.</span>
-              </div>
-
-              <a class="dict-link" href="#">
-                <svg viewBox="0 0 16 16" fill="currentColor">
-                  <path
-                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-                  />
-                </svg>
-                github.com/cristian/inception
-              </a>
-            </div>
+            <blockquote class="reveal">
+              We have built minds that can think for themselves.<br />We have not given them a world to live in.<br />
+              <p class="until reveal" style="margin-bottom: 0">Until now.</p>
+            </blockquote>
           </div>
           <div class="col-right">
             <!-- Pixel art: city emerging from coordinates -->
@@ -1162,9 +1240,42 @@
         <div class="col-left prose">
           <h2 class="section-title reveal">The Life Engine</h2>
           <p class="reveal">
-            The INCEPTION engine transforms a fine-tuned Mistral model into a complete agent brain — not a chatbot wrapper, not a prompt chain. A
-            cognitive architecture with five interlocking systems:
+            The INCEPTION engine transforms a fine-tuned Mistral model into a complete agent brain — not a chatbot wrapper, not a prompt chain.
           </p>
+          <!-- ===== DICTIONARY CARD ===== -->
+          <div class="dict-card reveal">
+            <span class="dict-word">inception</span>
+            <span class="dict-phonetic">/ɪnˈsɛpʃən/</span>
+            <span class="dict-pos">noun</span>
+
+            <div class="dict-def">
+              <span class="dict-num">1.</span>
+              <span class="dict-text"
+                >A life engine where autonomous AI agents are planted into the real world with persistent memory, self-reflection, and emergent social
+                behavior.</span
+              >
+              <span class="dict-sub"
+                >Observes. Remembers. Reflects. Acts.<br />Forms relationships. Keeps secrets.<br />Lives — on real streets, in real cities.<br /><br />Layers
+                deep: model → agent → memory → world → life.</span
+              >
+            </div>
+
+            <div class="dict-def dict-def-alt">
+              <span class="dict-num">2.</span>
+              <span class="dict-text">If nobody is watching, they keep living anyway.</span>
+            </div>
+
+            <a class="dict-link" href="#">
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <path
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+              github.com/cristian/inception
+            </a>
+          </div>
+
+          <p class="reveal" style="margin-top: 2rem">The Mistral-powered cognitive architecture with five interlocking systems works as follows:</p>
 
           <p class="reveal">
             <span class="feat">Memory Stream</span> — Every observation stored as natural language, timestamped and scored across three axes: recency,
@@ -1315,6 +1426,44 @@
           <p class="reveal">We planted one idea: <em>"Marie has a secret she's been hiding from her roommate."</em></p>
           <p class="reveal">Then we let it run. We didn't touch it. No follow-up prompts. No corrections. No guardrails.</p>
 
+          <div class="tweet-card reveal">
+            <div class="tweet-header">
+              <div class="tweet-author">
+                <div class="tweet-avatar">
+                  <img src="https://pbs.twimg.com/profile_images/2008546467615580160/57KcqsTA_400x400.jpg" alt="Elon Musk" />
+                </div>
+                <div>
+                  <div class="tweet-name-row">
+                    <span class="tweet-name">Elon Musk</span>
+                    <svg class="tweet-verified" viewBox="0 0 22 22" fill="none">
+                      <circle cx="11" cy="11" r="11" fill="#1d9bf0" />
+                      <path d="M9.5 14.25L6.25 11l1.06-1.06 2.19 2.19 4.69-4.69L15.25 8.5z" fill="#fff" />
+                    </svg>
+                  </div>
+                  <div class="tweet-handle">@elonmusk</div>
+                </div>
+              </div>
+              <a href="https://x.com/elonmusk/status/1931114060676018302" target="_blank" rel="noopener">
+                <svg class="tweet-x-logo" viewBox="0 0 24 24" fill="currentColor" style="color: #0f1419">
+                  <path
+                    d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+                  />
+                </svg>
+              </a>
+            </div>
+            <div class="tweet-body">
+              If simulation theory is correct, then my theory is probably right, as boring simulations are terminated to save compute costs, which is
+              what we do to simulations in our reality!
+            </div>
+            <div class="tweet-time">12:20 AM · Jun 7, 2025</div>
+            <div class="tweet-stats">
+              <span><strong>357</strong> Reposts</span>
+              <span><strong>384</strong> Replies</span>
+              <span><strong>3.1K</strong> Likes</span>
+              <span><strong>663.3K</strong> Views</span>
+            </div>
+          </div>
+
           <p class="reveal">
             Over thirty simulated minutes, Marie avoided Jean three times — taking longer routes to avoid their shared apartment. She walked to Le
             Consulat, a real café at 18 Rue Norvins in Montmartre, and confided in Amélie. Amélie's memory stream logged the secret. Her reflection
@@ -1441,8 +1590,8 @@
       <div class="sp-lg"></div>
       <section class="punchline">
         <div class="punch-rule"></div>
-        <p class="punch-dim reveal">Stanford simulated a town.</p>
-        <p class="punch-bold reveal">I simulated reality.</p>
+        <p class="punch-dim reveal">Your AI is built to please.</p>
+        <p class="punch-bold reveal" style="color: #ff1a1a">Inception gives it free will.</p>
       </section>
 
       <!-- ===== STACK ===== -->
@@ -1450,11 +1599,11 @@
         <div class="stack-row reveal">
           <div class="stack-item">
             <div class="stack-item-label">Intelligence</div>
-            <div class="stack-item-value">Mistral 7B</div>
+            <div class="stack-item-value">Mistral 14B</div>
           </div>
           <div class="stack-item">
             <div class="stack-item-label">Inference</div>
-            <div class="stack-item-value">Local GPU</div>
+            <div class="stack-item-value">NVIDIA Brev L40s</div>
           </div>
           <div class="stack-item">
             <div class="stack-item-label">Voice</div>
