@@ -237,7 +237,10 @@
         font-size: 0.72rem;
         letter-spacing: 0.25em;
         text-transform: uppercase;
-        color: var(--dim);
+        color: #fff;
+        background: #000;
+        padding: 0.3em 0.6em;
+        width: fit-content;
         margin-bottom: 2.5rem;
         opacity: 0;
         animation: fadeIn 1s ease 0.2s forwards;
@@ -247,7 +250,10 @@
         font-family: var(--body);
         font-size: 0.72rem;
         letter-spacing: 0.25em;
-        color: var(--dim);
+        color: #fff;
+        background: #000;
+        padding: 0.3em 0.6em;
+        width: fit-content;
         text-transform: uppercase;
         opacity: 0;
         margin-top: 2.5rem;
@@ -282,7 +288,10 @@
         font-size: 0.75rem;
         letter-spacing: 0.15em;
         text-transform: uppercase;
-        color: var(--faint);
+        color: #fff;
+        background: #000;
+        padding: 0.3em 0.6em;
+        width: fit-content;
         margin-bottom: 3rem;
         opacity: 0;
         animation: fadeIn 1s ease 1s forwards;
@@ -1151,38 +1160,59 @@
       <div class="two-col" id="memory">
         <div class="col-left prose">
           <h2 class="section-title reveal">The Life Engine</h2>
-          <p class="reveal">The INCEPTION engine transforms a fine-tuned Mistral model into a complete agent brain — not a chatbot wrapper, not a prompt chain. A cognitive architecture with five interlocking systems:</p>
-
           <p class="reveal">
-            <span class="feat">Memory Stream</span> — Every observation stored as natural language, timestamped and scored across three axes: recency, importance, and relevance. Retrieval uses a weighted combination of all three — the same way human memory works. A conversation from two weeks ago resurfaces because the person just walked in. Nothing is forgotten. Everything compounds.
+            The INCEPTION engine transforms a fine-tuned Mistral model into a complete agent brain — not a chatbot wrapper, not a prompt chain. A
+            cognitive architecture with five interlocking systems:
           </p>
 
           <p class="reveal">
-            <span class="feat">Reflection</span> — When accumulated importance crosses a dynamic threshold, agents pause and synthesize higher-order beliefs from recent memories. These reflections become memories themselves — recursively feeding future reflections. The agent doesn't just remember that Jean was cold. It concludes: <em>"I think my roommate is hiding something from me."</em> That conclusion then shapes every future decision.
+            <span class="feat">Memory Stream</span> — Every observation stored as natural language, timestamped and scored across three axes: recency,
+            importance, and relevance. Retrieval uses a weighted combination of all three — the same way human memory works. A conversation from two
+            weeks ago resurfaces because the person just walked in. Nothing is forgotten. Everything compounds.
           </p>
 
           <p class="reveal">
-            <span class="feat">Planning</span> — Each morning, agents generate a daily plan from three inputs: their identity description, yesterday's compressed experience, and current reflections. Plans are recursively decomposed — "spend afternoon at café" becomes "walk to Le Consulat at 14:00, order coffee, wait for Amélie, discuss the secret." Every sub-action is anchored to real coordinates and real time.
+            <span class="feat">Reflection</span> — When accumulated importance crosses a dynamic threshold, agents pause and synthesize higher-order
+            beliefs from recent memories. These reflections become memories themselves — recursively feeding future reflections. The agent doesn't
+            just remember that Jean was cold. It concludes: <em>"I think my roommate is hiding something from me."</em> That conclusion then shapes
+            every future decision.
+          </p>
+
+          <p class="reveal">
+            <span class="feat">Planning</span> — Each morning, agents generate a daily plan from three inputs: their identity description, yesterday's
+            compressed experience, and current reflections. Plans are recursively decomposed — "spend afternoon at café" becomes "walk to Le Consulat
+            at 14:00, order coffee, wait for Amélie, discuss the secret." Every sub-action is anchored to real coordinates and real time.
           </p>
 
           <p class="reveal" id="grounded">
-            <span class="feat">Grounded Reality</span> — This is where INCEPTION diverges from every prior simulation. Agents don't walk to "The Café." They walk to Le Consulat, 18 Rue Norvins, 75018 Paris — a real place at real coordinates (48.8867°N, 2.3431°E). Navigation uses Mapbox GL with actual walking distances and travel times. The agent's world <em>is</em> the world. Every decision maps to reality.
+            <span class="feat">Grounded Reality</span> — This is where INCEPTION diverges from every prior simulation. Agents don't walk to "The
+            Café." They walk to Le Consulat, 18 Rue Norvins, 75018 Paris — a real place at real coordinates (48.8867°N, 2.3431°E). Navigation uses
+            Mapbox GL with actual walking distances and travel times. The agent's world <em>is</em> the world. Every decision maps to reality.
           </p>
 
           <p class="reveal" id="voice">
-            <span class="feat">Voice</span> — Every agent personality has a persistent ElevenLabs voice clone. Conversations are not text on a screen — they are spoken. You hear Marie's anxiety when she lies. You hear Jean's voice crack when he confronts her. Every word is generated. Every inflection is emergent. Every silence is a decision.
+            <span class="feat">Voice</span> — Every agent personality has a persistent ElevenLabs voice clone. Conversations are not text on a screen
+            — they are spoken. You hear Marie's anxiety when she lies. You hear Jean's voice crack when he confronts her. Every word is generated.
+            Every inflection is emergent. Every silence is a decision.
           </p>
 
           <p class="reveal">
-            <span class="feat">Social Cognition</span> — Agents maintain relationship graphs with trust scores, emotional valence, and interaction history. Trust decays with avoidance. It builds with vulnerability. Gossip propagates through the network with probabilistic decay — exactly like real social dynamics. An agent who overhears a secret must decide: keep it, share it, or use it.
+            <span class="feat">Social Cognition</span> — Agents maintain relationship graphs with trust scores, emotional valence, and interaction
+            history. Trust decays with avoidance. It builds with vulnerability. Gossip propagates through the network with probabilistic decay —
+            exactly like real social dynamics. An agent who overhears a secret must decide: keep it, share it, or use it.
           </p>
 
           <p class="reveal">
-            <span class="feat">Local Inference</span> — The entire system runs on a single consumer GPU. No cloud API calls. No rate limits. No data leaving the machine. Mistral 7B fine-tuned on structured agent tasks, served through vLLM at 142 tokens/second on an RTX 4090. Latency per cognitive cycle: under 200ms. This is not a demo. This is a runtime.
+            <span class="feat">Local Inference</span> — The entire system runs on a single consumer GPU. No cloud API calls. No rate limits. No data
+            leaving the machine. Mistral 7B fine-tuned on structured agent tasks, served through vLLM at 142 tokens/second on an RTX 4090. Latency per
+            cognitive cycle: under 200ms. This is not a demo. This is a runtime.
           </p>
 
           <div class="cli-box reveal"><span class="prompt">$</span> inception --city paris --agents 4 --model mistral-7b-ft --local</div>
-          <div class="cli-box reveal"><span class="prompt">$</span> inception status --verbose<br><br>agents: 4 alive · memories: 3,241 · reflections: 187<br>world: paris/montmartre · time: 16:22 local<br>gpu: 71% util · vram: 6.2/24 GB · tokens/s: 142<br>uptime: 3h 41m · cycles: 1,847</div>
+          <div class="cli-box reveal">
+            <span class="prompt">$</span> inception status --verbose<br /><br />agents: 4 alive · memories: 3,241 · reflections: 187<br />world:
+            paris/montmartre · time: 16:22 local<br />gpu: 71% util · vram: 6.2/24 GB · tokens/s: 142<br />uptime: 3h 41m · cycles: 1,847
+          </div>
         </div>
         <div class="col-right">
           <!-- Pixel art: brain/mind -->
@@ -1285,35 +1315,53 @@
           <p class="reveal">Then we let it run. We didn't touch it. No follow-up prompts. No corrections. No guardrails.</p>
 
           <p class="reveal">
-            Over thirty simulated minutes, Marie avoided Jean three times — taking longer routes to avoid their shared apartment. She walked to Le Consulat, a real café at 18 Rue Norvins in Montmartre, and confided in Amélie. Amélie's memory stream logged the secret. Her reflection system concluded: <em>"This is important. But it's not mine to share."</em>
+            Over thirty simulated minutes, Marie avoided Jean three times — taking longer routes to avoid their shared apartment. She walked to Le
+            Consulat, a real café at 18 Rue Norvins in Montmartre, and confided in Amélie. Amélie's memory stream logged the secret. Her reflection
+            system concluded: <em>"This is important. But it's not mine to share."</em>
           </p>
 
           <p class="reveal">
-            Forty minutes later, Amélie's trust score with Thomas (a barman at Bar des Artistes) crossed a threshold. She mentioned Lyon. Not as gossip — as concern. Thomas, whose relationship graph showed a weak tie to Jean, mentioned it in passing. The information propagated through the social network with no central coordinator. <strong>Gossip emerged from architecture, not instruction.</strong>
+            Forty minutes later, Amélie's trust score with Thomas (a barman at Bar des Artistes) crossed a threshold. She mentioned Lyon. Not as
+            gossip — as concern. Thomas, whose relationship graph showed a weak tie to Jean, mentioned it in passing. The information propagated
+            through the social network with no central coordinator. <strong>Gossip emerged from architecture, not instruction.</strong>
           </p>
 
           <p class="reveal">
-            At 16:15 simulated time, Jean confronted Marie in their apartment. His reflection log read: <em>"Everyone seems to know something I don't. Marie has been avoiding me. Something is wrong."</em> He didn't know about Lyon. He inferred it from behavioral patterns — the same way a human would.
-          </p>
-
-          <p class="reveal"><strong>Nobody scripted this. Nobody prompted this. The drama emerged from five systems interacting: memory, reflection, planning, social cognition, and grounded navigation.</strong></p>
-
-          <p class="reveal">
-            This is not prompt engineering. This is <strong>emergent social dynamics</strong> — the same phenomenon studied in complex systems theory, computational sociology, and agent-based modeling. The difference: previous models used toy environments with abstract rules. INCEPTION uses a real city, real distances, real language, and real voice.
+            At 16:15 simulated time, Jean confronted Marie in their apartment. His reflection log read:
+            <em>"Everyone seems to know something I don't. Marie has been avoiding me. Something is wrong."</em> He didn't know about Lyon. He
+            inferred it from behavioral patterns — the same way a human would.
           </p>
 
           <p class="reveal">
-            The player — watching this unfold on a live Mapbox view of Paris — can walk over and intervene. Introduce themselves. Lie. Befriend Marie. Warn Jean. Or just watch. The agents will form opinions about you. They will remember what you said. They will discuss you when you leave the room. And if you never show up at all — they keep living anyway.
+            <strong
+              >Nobody scripted this. Nobody prompted this. The drama emerged from five systems interacting: memory, reflection, planning, social
+              cognition, and grounded navigation.</strong
+            >
+          </p>
+
+          <p class="reveal">
+            This is not prompt engineering. This is <strong>emergent social dynamics</strong> — the same phenomenon studied in complex systems theory,
+            computational sociology, and agent-based modeling. The difference: previous models used toy environments with abstract rules. INCEPTION
+            uses a real city, real distances, real language, and real voice.
+          </p>
+
+          <p class="reveal">
+            The player — watching this unfold on a live Mapbox view of Paris — can walk over and intervene. Introduce themselves. Lie. Befriend Marie.
+            Warn Jean. Or just watch. The agents will form opinions about you. They will remember what you said. They will discuss you when you leave
+            the room. And if you never show up at all — they keep living anyway.
           </p>
 
           <blockquote class="reveal">The single axiom: <em>if nobody is watching, they keep living anyway.</em></blockquote>
 
           <p class="dim reveal">
-            In Christopher Nolan's film, inception is the act of planting an idea so deep in someone's mind that they believe it was always theirs. In this system, the planted idea is simpler: <em>you are alive.</em> The agents don't question it. They act on it. They build relationships on it. They suffer because of it. The deeper you go, the more real it feels — for them, and for you.
+            In Christopher Nolan's film, inception is the act of planting an idea so deep in someone's mind that they believe it was always theirs. In
+            this system, the planted idea is simpler: <em>you are alive.</em> The agents don't question it. They act on it. They build relationships
+            on it. They suffer because of it. The deeper you go, the more real it feels — for them, and for you.
           </p>
 
           <p class="dim reveal">
-            The question is no longer whether AI can think. It's whether AI can <em>care</em>. Not because we told it to. Because the architecture made it inevitable.
+            The question is no longer whether AI can think. It's whether AI can <em>care</em>. Not because we told it to. Because the architecture
+            made it inevitable.
           </p>
         </div>
         <div class="col-right">
