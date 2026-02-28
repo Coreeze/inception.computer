@@ -14,8 +14,38 @@ import {
 import { applyMissionProgressChange } from "../../simulation/subscribers/beingDecay";
 import { MilestoneEvent } from "../../simulation/heartbeat/heartbeatSubscribers";
 import { completeJSON } from "../../services/ai/openrouter";
+import { generateFlux2FastImage } from "../../services/ai/fal";
 import { stringifyCharacter, stringifyNPC } from "../../services/character/serialize";
 import { io, playerSocketMap } from "../../index";
+import { formatSimDate } from "../../utils/formatSimDate";
+
+async function resolveChatParticipants(
+  playerID: string,
+  characterID: string,
+  npcID: string
+) {
+  const user = await User.findOne({ player_id: playerID });
+  if (!user) {
+    throw new Error("Player not found");
+  }
+  const character = await Being.findById(characterID);
+  if (!character) {
+    throw new Error("Character not found");
+  }
+  if (character.user?.toString() !== user._id.toString()) {
+    throw new Error("Character does not belong to player");
+  }
+  const npc = await Being.findOne({
+    _id: npcID,
+    main_character: character._id,
+    is_deleted: { $ne: true },
+    is_dead: { $ne: true },
+  });
+  if (!npc) {
+    throw new Error("NPC not found");
+  }
+  return { user, character, npc };
+}
 
 export const heartbeatEndpoint = async (req: Request, res: Response) => {
   try {
@@ -89,7 +119,7 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
 
     const heartbeatId = character.active_heartbeat_id;
     const milestoneEvents: MilestoneEvent[] = [];
-    const dateStr = `${sandbox.current_month}/${sandbox.current_day}/${sandbox.current_year}`;
+    const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
 
     if (choice === "ignore") {
       character.active_heartbeat_id = undefined;
@@ -163,46 +193,56 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
 
 export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
   try {
-    const { playerID, characterID, npcID, content } = req.body;
-    const message = typeof content === "string" ? content.trim() : "";
-    if (!playerID || !characterID || !npcID || !message) {
+    const { playerID, characterID, npcID, content, kind, imagePrompt, imageURL } = req.body;
+    const messageKind = kind === "image" ? "image" : "text";
+    const textMessage = typeof content === "string" ? content.trim() : "";
+    const imagePromptMessage =
+      typeof imagePrompt === "string" ? imagePrompt.trim() : "";
+    const selectedImageURL = typeof imageURL === "string" ? imageURL.trim() : "";
+    if (!playerID || !characterID || !npcID) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    if (message.length > 600) {
+    if (messageKind === "text" && !textMessage) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (messageKind === "image" && !imagePromptMessage) {
+      return res.status(400).json({ error: "Image prompt is required" });
+    }
+    if (messageKind === "image" && !selectedImageURL) {
+      return res.status(400).json({ error: "Generated image is required" });
+    }
+    if (textMessage.length > 600) {
       return res.status(400).json({ error: "Message too long (max 600 chars)" });
     }
-
-    const user = await User.findOne({ player_id: playerID });
-    if (!user) return res.status(404).json({ error: "Player not found" });
-
-    const character = await Being.findById(characterID);
-    if (!character) return res.status(404).json({ error: "Character not found" });
-    if (character.user?.toString() !== user._id.toString()) {
-      return res.status(403).json({ error: "Character does not belong to player" });
+    if (imagePromptMessage.length > 400) {
+      return res.status(400).json({ error: "Image prompt too long (max 400 chars)" });
     }
 
-    const npc = await Being.findOne({
-      _id: npcID,
-      main_character: character._id,
-      is_deleted: { $ne: true },
-      is_dead: { $ne: true },
-    });
-    if (!npc) return res.status(404).json({ error: "NPC not found" });
+    const { user, character, npc } = await resolveChatParticipants(
+      playerID,
+      characterID,
+      npcID
+    );
 
-    const userMessage = await Chat.create({
+    const userMessageData: Record<string, unknown> = {
       user: user._id,
       main_character: character._id,
-      type: "text",
+      type: messageKind,
       channel: "texting",
       sender: "user",
       sender_id: npc._id,
-      content: message,
-    });
+      content: messageKind === "image" ? imagePromptMessage : textMessage,
+    };
+
+    if (messageKind === "image") {
+      userMessageData.image_url = selectedImageURL;
+    }
+
+    const userMessage = await Chat.create(userMessageData);
 
     const recentChats = await Chat.find({
       main_character: character._id,
       sender_id: npc._id,
-      type: "text",
       channel: "texting",
       sender: { $in: ["user", "npc"] },
     })
@@ -211,13 +251,23 @@ export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
 
     const transcript = recentChats
       .reverse()
-      .map((c) => `${c.sender}: ${c.content}`)
+      .map((c) => {
+        if (c.type === "image") {
+          return `${c.sender}: [Image sent] Prompt: ${c.content}`;
+        }
+        return `${c.sender}: ${c.content}`;
+      })
       .join("\n");
+
+    const latestUserMessageContext =
+      messageKind === "image"
+        ? `[Image sent] Prompt: ${imagePromptMessage}`
+        : textMessage;
 
     const npcReplyJSON = await completeJSON<{ reply: string }>({
       model: "fast",
       systemPrompt: "You write short in-character NPC text replies for a life simulation.",
-      userPrompt: `You are replying as this NPC:\n${stringifyNPC(npc)}\n\nMain character context:\n${stringifyCharacter(character)}\n\nConversation so far:\n${transcript}\n\nLatest user message:\n${message}\n\nReturn JSON only: {"reply":"..."}.\nRules: 1-3 short sentences. Stay in-character. No markdown. No emojis.`,
+      userPrompt: `You are replying as this NPC:\n${stringifyNPC(npc)}\n\nMain character context:\n${stringifyCharacter(character)}\n\nConversation so far:\n${transcript}\n\nLatest user message:\n${latestUserMessageContext}\n\nReturn JSON only: {"reply":"..."}.\nRules: 1-3 short sentences. Stay in-character. No markdown. No emojis.`,
       maxTokens: 300,
     });
 
@@ -244,6 +294,36 @@ export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
     return res.json({ chats });
   } catch (error: any) {
     console.error("Send chat message error:", error);
-    return res.status(400).json({ error: error.message });
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "NPC not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
+  }
+};
+
+export const generateChatImagePreviewEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, npcID, imagePrompt } = req.body;
+    const prompt = typeof imagePrompt === "string" ? imagePrompt.trim() : "";
+    if (!playerID || !characterID || !npcID || !prompt) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (prompt.length > 400) {
+      return res.status(400).json({ error: "Image prompt too long (max 400 chars)" });
+    }
+
+    await resolveChatParticipants(playerID, characterID, npcID);
+    const imageUrl = await generateFlux2FastImage(prompt);
+    return res.json({ imageUrl });
+  } catch (error: any) {
+    console.error("Generate chat image preview error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "NPC not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
   }
 };

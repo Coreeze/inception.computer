@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { Being } from "../../database/models/being";
+import { formatSimDate } from "../../utils/formatSimDate";
 
 /**
  * Append memory text to a Being's life_md.
@@ -25,7 +26,7 @@ export async function addMemory({
 
   const dateStr =
     simYear != null && simMonth != null && simDay != null
-      ? `${simMonth}/${simDay}/${simYear}`
+      ? formatSimDate(simYear, simMonth, simDay)
       : "";
   const line = dateStr ? `\n- **${dateStr}** — ${memoryMd.trim()}` : `\n- ${memoryMd.trim()}`;
 

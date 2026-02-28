@@ -101,6 +101,8 @@ export interface IChatMessage {
   _id: string;
   sender: "user" | "npc" | "system" | "event" | "place";
   sender_id?: string;
+  type?: "text" | "image" | "audio" | "video" | "introduction" | "suggested_action" | "memory" | "moderation" | "info";
   content: string;
+  image_url?: string;
   createdAt?: string;
 }

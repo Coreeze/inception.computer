@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  generateChatImagePreviewEndpoint,
   heartbeatEndpoint,
   resolveChoiceEndpoint,
   sendChatMessageEndpoint,
@@ -11,6 +12,7 @@ const runtimeRouter = Router();
 runtimeRouter.post("/sandbox-runtime/heartbeat", heartbeatEndpoint);
 runtimeRouter.post("/sandbox-runtime/resolve-choice", resolveChoiceEndpoint);
 runtimeRouter.post("/sandbox-runtime/initialize", initializeEndpoint);
+runtimeRouter.post("/sandbox-runtime/chat/image-preview", generateChatImagePreviewEndpoint);
 runtimeRouter.post("/sandbox-runtime/chat", sendChatMessageEndpoint);
 
 export { runtimeRouter };

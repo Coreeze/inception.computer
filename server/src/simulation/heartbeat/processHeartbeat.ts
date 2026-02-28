@@ -7,6 +7,7 @@ import { MilestoneEvent, broadcastHeartbeat } from "./heartbeatSubscribers";
 import { StatusPraesens, interpretBeingStats } from "./statusPraesens";
 import { checkSignals } from "./signals";
 import { generateChoices } from "./generateChoices";
+import { formatSimDate } from "../../utils/formatSimDate";
 
 async function processNPCAction(
   npc: IBeing,
@@ -198,7 +199,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
   //   }).catch((err) => console.error("Choice generation fire-and-forget failed:", err));
   // }
 
-  const dateStr = `Day ${sandbox.current_day}, Month ${sandbox.current_month}, Year ${sandbox.current_year}`;
+  const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
 
   if (character.player_action_queue?.length) {
     const action = character.player_action_queue.shift();

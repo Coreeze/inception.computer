@@ -19,7 +19,43 @@ export async function sendChatMessage(characterID: string, npcID: string, conten
       playerID: getPlayerID(),
       characterID,
       npcID,
+      kind: "text",
       content,
+    }),
+  });
+}
+
+export async function sendChatImage(
+  characterID: string,
+  npcID: string,
+  imagePrompt: string,
+  imageURL: string
+) {
+  return apiFetch("/sandbox-runtime/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      npcID,
+      kind: "image",
+      imagePrompt,
+      imageURL,
+    }),
+  });
+}
+
+export async function generateChatImagePreview(
+  characterID: string,
+  npcID: string,
+  imagePrompt: string
+) {
+  return apiFetch("/sandbox-runtime/chat/image-preview", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      npcID,
+      imagePrompt,
     }),
   });
 }
