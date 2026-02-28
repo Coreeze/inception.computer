@@ -181,6 +181,10 @@ const beingsSchema = new mongoose.Schema(
     monthly_expenses: { type: Number },
     monthly_income: { type: Number },
 
+    engine_version: { type: String },
+    user_inputs: { type: Object },
+    location: { type: ObjectId, ref: "Location" },
+
     is_main: { type: Boolean, default: false },
     based_on: { type: ObjectId, ref: "Beings" },
     is_draft: { type: Boolean },
@@ -200,6 +204,11 @@ const beingsSchema = new mongoose.Schema(
 beingsSchema.index({ main_character: 1 });
 beingsSchema.index({ sandbox: 1 });
 beingsSchema.index({ user: 1 });
+beingsSchema.index({ household: 1 });
+beingsSchema.index({ location: 1 });
+beingsSchema.index({ "family.children": 1 });
+beingsSchema.index({ "family.spouse": 1 });
+beingsSchema.index({ "pregnancy.is_pregnant": 1, "pregnancy.due_date": 1 });
 
 export interface IPlannedAction {
   action: string;

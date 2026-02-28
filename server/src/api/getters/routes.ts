@@ -7,7 +7,6 @@ import { Entity } from "../../database/models/entity";
 import { Edge } from "../../database/models/edge";
 import { Event } from "../../database/models/event";
 import { Chat } from "../../database/models/chat";
-import { Memory } from "../../database/models/memory";
 import { Notification } from "../../database/models/notification";
 import { WorldHistory } from "../../database/models/worldHistory";
 
@@ -74,12 +73,10 @@ getterRouter.get("/sandbox/chat/:characterID/:npcID", async (req: Request, res: 
 
 getterRouter.get("/sandbox/memories/:characterID", async (req: Request, res: Response) => {
   try {
-    const memories = await Memory.find({
-      main_character: req.params.characterID,
-      is_compressed: { $ne: true },
-    })
-      .sort({ importance: -1, createdAt: -1 })
-      .limit(100);
+    const character = await Being.findById(req.params.characterID);
+    const memories = character?.life_md
+      ? [{ content: character.life_md }]
+      : [];
     return res.json({ memories });
   } catch (error: any) {
     return res.status(400).json({ error: error.message });

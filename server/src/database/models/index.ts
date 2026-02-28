@@ -40,3 +40,12 @@ export { WorldStyles } from "./worldStyles";
 export type { IWorldStyles } from "./worldStyles";
 
 export { User } from "./user";
+
+export { Version } from "./version";
+export { UserSubscription } from "./userSubscription";
+export { Transaction } from "./transactions";
+export { SupportChat } from "./supportChat";
+export { ReferralCode } from "./referralCodes";
+export { Feedback } from "./feedback";
+export { DirectMessage } from "./directMessage";
+export { Conversation } from "./conversation";

@@ -25,6 +25,7 @@ const chatSchema = new mongoose.Schema(
     thumbs_up: { type: Boolean, default: false },
     thumbs_down: { type: Boolean, default: false },
     content: { type: String, required: true },
+    world_state: { type: ObjectId, ref: "WorldState" },
     year: { type: Number },
     month: { type: Number },
     day: { type: Number },

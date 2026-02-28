@@ -19,6 +19,7 @@ const notificationSchema = new mongoose.Schema(
     },
     text: { type: String, required: true },
     read: { type: Boolean, default: false, required: true },
+    world_state: { type: ObjectId, ref: "WorldState" },
     npcs: { type: [ObjectId] },
     places: { type: [ObjectId] },
     year: { type: Number },

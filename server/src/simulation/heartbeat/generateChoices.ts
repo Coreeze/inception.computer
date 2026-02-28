@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import { IBeing } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
-import { LLMLog } from "../../database/models/llmLog";
+import { setChoice } from "./choiceStore";
 import { Signal } from "./signals";
 import { StatusPraesens } from "./statusPraesens";
 import { completeJSON } from "../../services/ai/openrouter";
@@ -81,14 +81,7 @@ Options should be meaningfully different — one safe, one risky. Impacts should
       userPrompt: prompt,
     });
 
-    await LLMLog.create({
-      sandbox: sandbox._id,
-      heartbeat_id: heartbeatId,
-      call_type: "choice_generation",
-      llm_model: "mistral-small-3.1-24b-instruct",
-      prompt,
-      response,
-    });
+    setChoice(heartbeatId, response);
 
     character.is_processing = false;
     await character.save();

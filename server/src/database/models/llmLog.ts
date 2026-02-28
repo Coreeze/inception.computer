@@ -13,8 +13,6 @@ const llmLogSchema = new mongoose.Schema(
         "init_generation",
         "npc_chat",
         "event",
-        "npc_planning",
-        "memory_compression",
       ],
       required: true,
     },

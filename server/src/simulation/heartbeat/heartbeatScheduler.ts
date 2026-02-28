@@ -1,6 +1,6 @@
 import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
-import { LLMLog } from "../../database/models/llmLog";
+import { getChoice } from "./choiceStore";
 import { io, playerSocketMap } from "../../index";
 import { processHeartbeat } from "./processHeartbeat";
 import { getPlayerSession } from "../../socket/sessionManager";
@@ -86,16 +86,11 @@ async function runTick(characterID: string) {
     nextDelay = sandbox.day_duration_ms || 6000;
 
     if (character.active_heartbeat_id) {
-      const pendingChoiceLog = await LLMLog.findOne({
-        heartbeat_id: character.active_heartbeat_id,
-        call_type: "choice_generation",
-      })
-        .select("response")
-        .lean();
+      const pendingChoice = getChoice(character.active_heartbeat_id);
 
       if (
-        pendingChoiceLog?.response?.option_a &&
-        pendingChoiceLog?.response?.option_b
+        pendingChoice?.option_a &&
+        pendingChoice?.option_b
       ) {
         const now = Date.now();
         if (now - loop.lastChoiceReemitAt > 15000) {
@@ -104,7 +99,7 @@ async function runTick(characterID: string) {
             io.to(socketId).emit("choices_ready", {
               characterId: character._id.toString(),
               heartbeatId: character.active_heartbeat_id.toString(),
-              choices: pendingChoiceLog.response,
+              choices: pendingChoice,
               signals: [],
             });
           }

@@ -32,7 +32,7 @@ const worldHistorySchema = new mongoose.Schema(
     actor_id: { type: mongoose.Types.ObjectId },
     target_type: { type: String, enum: ["main_character", "npc"] },
     target_id: { type: mongoose.Types.ObjectId },
-    location: { type: mongoose.Types.ObjectId, ref: "Places" },
+    location: { type: mongoose.Types.ObjectId, ref: "Locations" },
     previous_state: { type: Object },
     new_state: { type: Object },
     change: { type: Object },

@@ -3,9 +3,10 @@ import { User } from "../../database/models/user";
 import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
 import { Places } from "../../database/models/places";
-import { WorldStyles } from "../../database/models/worldStyles";
 import { spawnNPCs } from "../../services/npc/spawnNPCs";
 import { generateAllNPCPlans } from "../../services/npc/planner";
+
+const CLASSIC_WORLD_STYLE_ID = "68d2400c61cd0dea7526beff";
 
 /**
  * POST /sandbox-runtime/initialize
@@ -39,24 +40,9 @@ export const initializeEndpoint = async (req: Request, res: Response) => {
       });
     }
 
-    let worldStyle = await WorldStyles.findOne({ user: user._id });
-    if (!worldStyle) {
-      worldStyle = await WorldStyles.create({
-        user: user._id,
-        name: "Default",
-        id: "default",
-        examples: ["realistic", "grounded"],
-        character_prompt: "realistic human portrait",
-        background_image: "",
-        object_prompt: "",
-        environment_prompt: "",
-        place_prompt: "",
-      });
-    }
-
     const sandbox = await Sandbox.create({
       user: user._id,
-      artwork_style: worldStyle._id,
+      artwork_style: CLASSIC_WORLD_STYLE_ID,
       start_year: 2026,
       start_month: 1,
       start_day: 1,

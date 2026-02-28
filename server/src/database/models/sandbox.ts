@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 const sandboxSchema = new mongoose.Schema(
   {
     user: { type: ObjectId, ref: "Users", required: true },
-    artwork_style: { type: ObjectId, ref: "WorldStyles", required: true },
+    artwork_style: { type: String, ref: "WorldStyles", required: true },
 
     start_year: { type: Number, required: true, default: 2026 },
     start_month: { type: Number, required: true, min: 1, max: 12, default: 1 },

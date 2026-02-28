@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
-import { LLMLog } from "../../database/models/llmLog";
+import { getChoice, deleteChoice } from "../../simulation/heartbeat/choiceStore";
 import {
   applyRuntimeAction,
 } from "../../socket/sessionManager";
@@ -90,6 +90,7 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
     if (choice === "ignore") {
       character.active_heartbeat_id = undefined;
       await character.save();
+      deleteChoice(heartbeatId);
       return res.json({ success: true, resolution: "ignore" });
     }
 
@@ -97,17 +98,14 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid choice." });
     }
 
-    const llmLog = await LLMLog.findOne({
-      heartbeat_id: heartbeatId,
-      call_type: "choice_generation",
-    });
-    if (!llmLog) {
+    const choices = getChoice(heartbeatId);
+    if (!choices) {
       character.active_heartbeat_id = undefined;
       await character.save();
       return res.status(404).json({ error: "Choice data not found" });
     }
 
-    const choiceData = (llmLog.response as any)?.[choice];
+    const choiceData = (choices as any)?.[choice];
     if (!choiceData) {
       return res.status(400).json({ error: "Invalid choice option" });
     }
@@ -139,6 +137,7 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
 
     character.active_heartbeat_id = undefined;
     await character.save();
+    deleteChoice(heartbeatId);
 
     return res.json({
       success: true,
