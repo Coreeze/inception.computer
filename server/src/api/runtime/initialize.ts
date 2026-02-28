@@ -112,7 +112,9 @@ export const initializeEndpoint = async (req: Request, res: Response) => {
         playerLat: character.home_latitude,
         count: 10,
       });
-      await generateAllNPCPlans({ sandbox });
+      generateAllNPCPlans({ sandbox }).catch((err) => {
+        console.error("NPC plan generation failed (background):", err);
+      });
     } catch (err) {
       console.error("NPC spawn/plan failed (continuing):", err);
     }

@@ -96,3 +96,11 @@ export interface MapPlace {
   is_home?: boolean;
   is_work?: boolean;
 }
+
+export interface IChatMessage {
+  _id: string;
+  sender: "user" | "npc" | "system" | "event" | "place";
+  sender_id?: string;
+  content: string;
+  createdAt?: string;
+}

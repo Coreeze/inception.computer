@@ -8,6 +8,7 @@ export default function ProfileDialog() {
   const showProfileDialog = useWorldStorage((s) => s.showProfileDialog);
   const profileCharacter = useWorldStorage((s) => s.profileCharacter);
   const closeProfile = useWorldStorage((s) => s.closeProfile);
+  const openChatDialog = useWorldStorage((s) => s.openChatDialog);
   const sandbox = useSimulationStorage((s) => s.sandbox);
 
   if (!showProfileDialog || !profileCharacter) return null;
@@ -41,6 +42,15 @@ export default function ProfileDialog() {
           </button>
         </div>
         <div className="space-y-4 p-4 font-mono text-sm">
+          {!isPlayer && (
+            <button
+              onClick={() => openChatDialog({ npcID: c._id })}
+              className="rounded-lg border border-black/20 px-3 py-1.5 text-xs"
+            >
+              Chat with {c.first_name || "NPC"}
+            </button>
+          )}
+
           <div className="grid grid-cols-2 gap-2 text-xs">
             {c.occupation && (
               <div>

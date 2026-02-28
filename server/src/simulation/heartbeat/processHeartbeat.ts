@@ -3,10 +3,7 @@ import { IBeing, IPlannedAction } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
 import { ObjectModel } from "../../database/models/object";
 import { Event } from "../../database/models/event";
-import {
-  MilestoneEvent,
-  broadcastHeartbeat,
-} from "./heartbeatSubscribers";
+import { MilestoneEvent, broadcastHeartbeat } from "./heartbeatSubscribers";
 import { StatusPraesens, interpretBeingStats } from "./statusPraesens";
 import { checkSignals } from "./signals";
 import { generateChoices } from "./generateChoices";
@@ -117,7 +114,7 @@ export interface HeartbeatResult {
     money: number;
     life_mission: number;
   };
-  statusPraesens: StatusPraesens | null;
+  // statusPraesens: StatusPraesens | null;
   isDead: boolean;
   deathReason: string | null;
   characterAction: {
@@ -132,20 +129,15 @@ export interface HeartbeatResult {
   npcUpdates: NPCUpdate[];
 }
 
-export async function processHeartbeat(
-  character: IBeing,
-  sandbox: ISandboxDocument,
-  npcs: IBeing[],
-  userID: string
-): Promise<HeartbeatResult> {
+export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocument, npcs: IBeing[], userID: string): Promise<HeartbeatResult> {
   const heartbeat_id = new ObjectId();
   const milestoneEvents: MilestoneEvent[] = [];
 
   const prevStats = {
-    health: character.health_index || 0,
-    vibe: character.vibe_index || 0,
-    money: character.wealth_index || 0,
-    life_mission: character.life_mission?.progress || 0,
+    health: character.health_index ?? 0,
+    vibe: character.vibe_index ?? 0,
+    money: character.wealth_index ?? 0,
+    life_mission: character.life_mission?.progress ?? 0,
   };
 
   const prevStatus = interpretBeingStats(character);
@@ -160,6 +152,7 @@ export async function processHeartbeat(
 
   if (character.is_dead) {
     await character.save();
+
     return {
       heartbeat_id: heartbeat_id.toString(),
       date: {
@@ -169,7 +162,7 @@ export async function processHeartbeat(
       },
       stats: { health: 0, vibe: 0, money: character.wealth_index ?? 0, life_mission: character.life_mission?.progress ?? 0 },
       statChanges: { health: -prevStats.health, vibe: -prevStats.vibe, money: 0, life_mission: 0 },
-      statusPraesens: null,
+      // statusPraesens: null,
       isDead: true,
       deathReason: character.death_reason || null,
       characterAction: {
@@ -185,32 +178,25 @@ export async function processHeartbeat(
     };
   }
 
-  const statusPraesens = interpretBeingStats(character);
-  const signals = checkSignals(
-    prevStatus,
-    statusPraesens,
-    sandbox.days_since_last_signal || 0
-  );
+  // const statusPraesens = interpretBeingStats(character);
+  // const signals = checkSignals(prevStatus, statusPraesens, sandbox.days_since_last_signal || 0);
 
-  if (signals.length > 0) {
-    sandbox.days_since_last_signal = 0;
-  } else {
-    sandbox.days_since_last_signal =
-      (sandbox.days_since_last_signal || 0) + 1;
-  }
+  // if (signals.length > 0) {
+  //   sandbox.days_since_last_signal = 0;
+  // } else {
+  //   sandbox.days_since_last_signal = (sandbox.days_since_last_signal || 0) + 1;
+  // }
 
-  if (signals.length > 0 && !character.active_heartbeat_id) {
-    generateChoices({
-      character,
-      sandbox,
-      signals,
-      statusPraesens,
-      heartbeatId: heartbeat_id,
-      userID,
-    }).catch((err) =>
-      console.error("Choice generation fire-and-forget failed:", err)
-    );
-  }
+  // if (signals.length > 0 && !character.active_heartbeat_id) {
+  //   generateChoices({
+  //     character,
+  //     sandbox,
+  //     signals,
+  //     statusPraesens,
+  //     heartbeatId: heartbeat_id,
+  //     userID,
+  //   }).catch((err) => console.error("Choice generation fire-and-forget failed:", err));
+  // }
 
   const dateStr = `Day ${sandbox.current_day}, Month ${sandbox.current_month}, Year ${sandbox.current_year}`;
 
@@ -225,8 +211,7 @@ export async function processHeartbeat(
       character.current_country = action.country;
       character.current_action_updated_at = new Date();
       const place = action.place ? ` at ${action.place}` : "";
-      character.life_md =
-        (character.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+      character.life_md = (character.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
     }
   } else {
     character.current_action = undefined;
@@ -245,8 +230,7 @@ export async function processHeartbeat(
         npc.current_city = action.city;
         npc.current_country = action.country;
         const place = action.place ? ` at ${action.place}` : "";
-        npc.life_md =
-          (npc.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+        npc.life_md = (npc.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
       }
     }
     npcUpdates.push({
@@ -288,7 +272,7 @@ export async function processHeartbeat(
       money: newStats.money - prevStats.money,
       life_mission: newStats.life_mission - prevStats.life_mission,
     },
-    statusPraesens,
+    // statusPraesens,
     isDead: false,
     deathReason: null,
     characterAction: {

@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
+import { User } from "../../database/models/user";
+import { Chat } from "../../database/models/chat";
 import { getChoice, deleteChoice } from "../../simulation/heartbeat/choiceStore";
 import {
   applyRuntimeAction,
@@ -11,6 +13,8 @@ import {
 } from "../../simulation/heartbeat/heartbeatScheduler";
 import { applyMissionProgressChange } from "../../simulation/subscribers/beingDecay";
 import { MilestoneEvent } from "../../simulation/heartbeat/heartbeatSubscribers";
+import { completeJSON } from "../../services/ai/openrouter";
+import { stringifyCharacter, stringifyNPC } from "../../services/character/serialize";
 import { io, playerSocketMap } from "../../index";
 
 export const heartbeatEndpoint = async (req: Request, res: Response) => {
@@ -153,6 +157,93 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Resolve choice error:", error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, npcID, content } = req.body;
+    const message = typeof content === "string" ? content.trim() : "";
+    if (!playerID || !characterID || !npcID || !message) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (message.length > 600) {
+      return res.status(400).json({ error: "Message too long (max 600 chars)" });
+    }
+
+    const user = await User.findOne({ player_id: playerID });
+    if (!user) return res.status(404).json({ error: "Player not found" });
+
+    const character = await Being.findById(characterID);
+    if (!character) return res.status(404).json({ error: "Character not found" });
+    if (character.user?.toString() !== user._id.toString()) {
+      return res.status(403).json({ error: "Character does not belong to player" });
+    }
+
+    const npc = await Being.findOne({
+      _id: npcID,
+      main_character: character._id,
+      is_deleted: { $ne: true },
+      is_dead: { $ne: true },
+    });
+    if (!npc) return res.status(404).json({ error: "NPC not found" });
+
+    const userMessage = await Chat.create({
+      user: user._id,
+      main_character: character._id,
+      type: "text",
+      channel: "texting",
+      sender: "user",
+      sender_id: npc._id,
+      content: message,
+    });
+
+    const recentChats = await Chat.find({
+      main_character: character._id,
+      sender_id: npc._id,
+      type: "text",
+      channel: "texting",
+      sender: { $in: ["user", "npc"] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(12);
+
+    const transcript = recentChats
+      .reverse()
+      .map((c) => `${c.sender}: ${c.content}`)
+      .join("\n");
+
+    const npcReplyJSON = await completeJSON<{ reply: string }>({
+      model: "fast",
+      systemPrompt: "You write short in-character NPC text replies for a life simulation.",
+      userPrompt: `You are replying as this NPC:\n${stringifyNPC(npc)}\n\nMain character context:\n${stringifyCharacter(character)}\n\nConversation so far:\n${transcript}\n\nLatest user message:\n${message}\n\nReturn JSON only: {"reply":"..."}.\nRules: 1-3 short sentences. Stay in-character. No markdown. No emojis.`,
+      maxTokens: 300,
+    });
+
+    const npcReply = (npcReplyJSON.reply || "").trim();
+    if (!npcReply) {
+      return res.status(500).json({ error: "NPC reply generation failed" });
+    }
+
+    const npcMessage = await Chat.create({
+      user: user._id,
+      main_character: character._id,
+      type: "text",
+      channel: "texting",
+      sender: "npc",
+      sender_id: npc._id,
+      content: npcReply,
+    });
+
+    npc.chat_count = (npc.chat_count || 0) + 1;
+    npc.last_contact_at = new Date();
+    await npc.save();
+
+    const chats = [userMessage, npcMessage];
+    return res.json({ chats });
+  } catch (error: any) {
+    console.error("Send chat message error:", error);
     return res.status(400).json({ error: error.message });
   }
 };

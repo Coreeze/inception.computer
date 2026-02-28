@@ -9,6 +9,7 @@ export default function PeoplePopup() {
   const npcs = useWorldStorage((s) => s.npcs);
   const triggerFocusCoordinates = useWorldStorage((s) => s.triggerFocusCoordinates);
   const openProfile = useWorldStorage((s) => s.openProfile);
+  const openChatDialog = useWorldStorage((s) => s.openChatDialog);
 
   if (!showPeoplePopup) return null;
 
@@ -73,6 +74,12 @@ export default function PeoplePopup() {
                   className="rounded border border-black/20 px-2 py-1 text-[10px]"
                 >
                   View profile
+                </button>
+                <button
+                  onClick={() => openChatDialog({ npcID: npc._id })}
+                  className="rounded border border-black/20 px-2 py-1 text-[10px]"
+                >
+                  Chat
                 </button>
                 {npc.current_longitude != null && npc.current_latitude != null && (
                   <button

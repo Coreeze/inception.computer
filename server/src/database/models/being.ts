@@ -261,6 +261,9 @@ export interface IPlannedAction {
   city?: string;
   longitude?: number;
   latitude?: number;
+  start_year?: number;
+  start_month?: number;
+  start_day?: number;
   place_id?: mongoose.Types.ObjectId | string;
   participants?: (mongoose.Types.ObjectId | string)[];
   is_idle?: boolean;

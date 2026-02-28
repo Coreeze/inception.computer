@@ -80,10 +80,10 @@ export default function Globe() {
       el.className = "character-marker";
       el.style.cssText = `
         width: 52px; height: 52px; border-radius: 50%;
-        background: #ff1a1a; border: 3px solid white;
+        background: #ff1a1a; border: 3px solid #f9f7f3;
         box-shadow: 0 0 20px rgba(255,26,26,0.5);
         display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: bold; font-size: 16px;
+        color: #1a1714; font-weight: bold; font-size: 16px;
         font-family: 'IBM Plex Mono', monospace;
       `;
       el.textContent = (character.first_name?.[0] || "?").toUpperCase();
@@ -154,7 +154,7 @@ export default function Globe() {
           .setLngLat([npc.current_longitude, npc.current_latitude])
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
                 <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
                 <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
                 <button data-open-profile data-npc-id="${
@@ -179,39 +179,93 @@ export default function Globe() {
     discoveryMarkers.current = [];
 
     if (showDiscoveriesOnMap) {
-      const seen = new Set<string>();
+      const seenPlaces = new Set<string>();
+      const seenPeople = new Set<string>();
+
+      const hashString = (value: string) => {
+        let hash = 0;
+        for (let i = 0; i < value.length; i++) {
+          hash = (hash << 5) - hash + value.charCodeAt(i);
+          hash |= 0;
+        }
+        return Math.abs(hash);
+      };
+
       for (const npc of npcs) {
-        if (!npc.discovered_places) continue;
-        for (const p of npc.discovered_places) {
-          if (p.latitude == null || p.longitude == null) continue;
-          const key = `${p.longitude.toFixed(4)}_${p.latitude.toFixed(4)}_${p.name}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
+        if (npc.discovered_places) {
+          for (const p of npc.discovered_places) {
+            if (p.latitude == null || p.longitude == null) continue;
+            const key = `${p.longitude.toFixed(4)}_${p.latitude.toFixed(4)}_${p.name}`;
+            if (seenPlaces.has(key)) continue;
+            seenPlaces.add(key);
 
-          const el = document.createElement("div");
-          el.style.cssText = `
-            width: 24px; height: 24px; border-radius: 50%;
-            background: #2563eb; border: 2px solid white;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 10px; font-weight: 600;
-            font-family: 'IBM Plex Mono', monospace; cursor: pointer;
-          `;
-          el.textContent = "P";
+            const el = document.createElement("div");
+            el.style.cssText = `
+              min-width: 22px; height: 22px; border-radius: 6px;
+              background: #2563eb; border: 1px solid #f9f7f3;
+              display: flex; align-items: center; justify-content: center;
+              color: #1a1714; font-size: 10px; font-weight: 600;
+              font-family: 'IBM Plex Mono', monospace; cursor: pointer;
+              padding: 0 5px;
+            `;
+            el.textContent = "[P]";
 
-          const marker = new mapboxgl.Marker({ element: el })
-            .setLngLat([p.longitude, p.latitude])
-            .setPopup(
-              new mapboxgl.Popup({ offset: 25 }).setHTML(`
-                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px;">
-                  <strong>${p.name}</strong><br/>
-                  ${p.description ? `<span style="color: #7a756d;">${p.description}</span><br/>` : ""}
-                  <span style="color: #7a756d; font-size: 10px;">Discovered by ${npc.first_name} ${npc.last_name}</span>
-                </div>
-              `)
-            )
-            .addTo(map.current!);
+            const marker = new mapboxgl.Marker({ element: el })
+              .setLngLat([p.longitude, p.latitude])
+              .setPopup(
+                new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                  <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+                    <strong>${p.name}</strong><br/>
+                    ${p.description ? `<span style="color: #7a756d;">${p.description}</span><br/>` : ""}
+                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${npc.first_name} ${npc.last_name}</span>
+                  </div>
+                `)
+              )
+              .addTo(map.current!);
 
-          discoveryMarkers.current.push(marker);
+            discoveryMarkers.current.push(marker);
+          }
+        }
+
+        if (npc.discovered_people && npc.current_longitude != null && npc.current_latitude != null) {
+          for (const person of npc.discovered_people) {
+            const fullName = `${person.first_name || ""} ${person.last_name || ""}`.trim();
+            if (!fullName) continue;
+            const key = `${npc._id}_${fullName.toLowerCase()}`;
+            if (seenPeople.has(key)) continue;
+            seenPeople.add(key);
+
+            const seed = hashString(`${npc._id}_${fullName}`);
+            const lonOffset = ((seed % 17) - 8) * 0.003;
+            const latOffset = ((((seed >> 4) % 17) - 8) * 0.003) / 2;
+
+            const el = document.createElement("div");
+            el.style.cssText = `
+              min-width: 22px; height: 22px; border-radius: 6px;
+              background: #dc2626; border: 1px solid #f9f7f3;
+              display: flex; align-items: center; justify-content: center;
+              color: #1a1714; font-size: 10px; font-weight: 600;
+              font-family: 'IBM Plex Mono', monospace; cursor: pointer;
+              padding: 0 5px;
+            `;
+            el.textContent = "[@]";
+
+            const marker = new mapboxgl.Marker({ element: el })
+              .setLngLat([npc.current_longitude + lonOffset, npc.current_latitude + latOffset])
+              .setPopup(
+                new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                  <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+                    <strong>${fullName}</strong><br/>
+                    ${person.occupation ? `<span style="color: #7a756d;">${person.occupation}</span><br/>` : ""}
+                    ${person.description ? `<span style="color: #7a756d;">${person.description}</span><br/>` : ""}
+                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${npc.first_name} ${npc.last_name}</span>
+                  </div>
+                `)
+              )
+              .addTo(map.current!);
+
+            discoveryMarkers.current.push(marker);
+          }
         }
       }
     }
@@ -264,7 +318,7 @@ export default function Globe() {
 
       {/* Status bar + People */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-start justify-between gap-2">
-        <div className="bg-[#f9f7f3]/90 backdrop-blur-sm border border-[#d1cbc3] px-4 py-2 font-mono text-xs">
+        <div className="bg-[#f9f7f3]/90 backdrop-blur-sm border border-[#d1cbc3] px-4 py-2 font-mono text-xs text-[#1a1714]">
           <img src="logo-text.png" alt="inception.computer" className="w-auto h-6" />
           {sandbox && (
             <span className="ml-1.5">
@@ -280,20 +334,20 @@ export default function Globe() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowPeoplePopup(true)}
-            className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs backdrop-blur-sm"
+            className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
           >
             AI People ({npcs.length + (character ? 1 : 0)})
           </button>
           <button
             onClick={() => setShowDiscoveriesPopup(true)}
-            className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs backdrop-blur-sm"
+            className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
           >
             Discoveries
           </button>
           <button
             onClick={() => setShowDiscoveriesOnMap(!showDiscoveriesOnMap)}
             className={`rounded-lg border px-3 py-1.5 font-mono text-xs backdrop-blur-sm ${
-              showDiscoveriesOnMap ? "border-[#2563eb] bg-[#2563eb]/20 text-[#2563eb]" : "border-[#d1cbc3] bg-[#f9f7f3]/90"
+              showDiscoveriesOnMap ? "border-[#2563eb] bg-[#2563eb]/20 text-[#2563eb]" : "border-[#d1cbc3] bg-[#f9f7f3]/90 text-[#1a1714]"
             }`}
           >
             On map
@@ -301,12 +355,12 @@ export default function Globe() {
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs backdrop-blur-sm"
+              className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
             >
               Menu
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 min-w-[140px] rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] py-1 font-mono text-xs shadow-lg z-50">
+              <div className="absolute right-0 top-full mt-1 min-w-[140px] rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] py-1 font-mono text-xs text-[#1a1714] shadow-lg z-50">
                 <button
                   onClick={goHome}
                   disabled={character?.home_longitude == null || character?.home_latitude == null}

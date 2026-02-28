@@ -1,4 +1,4 @@
-import { apiFetch } from "./index";
+import { apiFetch, getPlayerID } from "./index";
 
 export async function loadCharacterWorld(characterID: string) {
   return apiFetch(`/sandbox/character/${characterID}`);
@@ -10,6 +10,18 @@ export async function loadEvents(characterID: string) {
 
 export async function loadChat(characterID: string, npcID: string) {
   return apiFetch(`/sandbox/chat/${characterID}/${npcID}`);
+}
+
+export async function sendChatMessage(characterID: string, npcID: string, content: string) {
+  return apiFetch("/sandbox-runtime/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      npcID,
+      content,
+    }),
+  });
 }
 
 export async function loadMemories(characterID: string) {

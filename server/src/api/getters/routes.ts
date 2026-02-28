@@ -61,6 +61,8 @@ getterRouter.get("/sandbox/chat/:characterID/:npcID", async (req: Request, res: 
     const chats = await Chat.find({
       main_character: req.params.characterID,
       sender_id: req.params.npcID,
+      sender: { $in: ["user", "npc"] },
+      channel: "texting",
     })
       .sort({ createdAt: -1 })
       .limit(50);
