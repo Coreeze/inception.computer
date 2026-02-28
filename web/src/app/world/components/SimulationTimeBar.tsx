@@ -132,14 +132,22 @@ export default function SimulationTimeBar({ showControls = true }: SimulationTim
               <button
                 onClick={() => handleModeChange("paused")}
                 disabled={!isPlaying}
-                className="rounded-full border border-black/20 px-2 py-1 text-xs disabled:opacity-40"
+                className={`rounded-full border px-2 py-1 text-xs transition-colors ${
+                  !isPlaying
+                    ? "border-red-600 bg-red-600 text-white shadow-sm cursor-default"
+                    : "border-black/10 bg-white/40 text-black/40"
+                }`}
               >
                 Pause
               </button>
               <button
                 onClick={() => handleModeChange("normal")}
                 disabled={isPlaying}
-                className="rounded-full border border-black/20 px-2 py-1 text-xs disabled:opacity-40"
+                className={`rounded-full border px-2 py-1 text-xs transition-colors ${
+                  isPlaying
+                    ? "border-red-600 bg-red-600 text-white shadow-sm cursor-default"
+                    : "border-black/10 bg-white/40 text-black/40"
+                }`}
               >
                 Play
               </button>
@@ -147,14 +155,12 @@ export default function SimulationTimeBar({ showControls = true }: SimulationTim
           )}
           <span className="text-xs text-black/60">{sandbox.current_year}</span>
         </div>
-        {isPlaying && (
-          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/10">
-            <div
-              className="h-full rounded-full bg-black/30 transition-[width] duration-100 ease-linear"
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-        )}
+        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/10">
+          <div
+            className="h-full rounded-full bg-black/30 transition-[width] duration-100 ease-linear"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
       </div>
     </div>
   );
