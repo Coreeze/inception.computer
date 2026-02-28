@@ -152,6 +152,26 @@ const beingsSchema = new mongoose.Schema(
           health_impact: { type: Number },
           vibe_impact: { type: Number },
           wealth_impact: { type: Number },
+          action_type: { type: String, enum: ["move", "discover_place", "discover_person", "buy", "event"] },
+          discovery_place: {
+            name: { type: String },
+            description: { type: String },
+            latitude: { type: Number },
+            longitude: { type: Number },
+          },
+          discovery_person: {
+            first_name: { type: String },
+            last_name: { type: String },
+            description: { type: String },
+            occupation: { type: String },
+          },
+          purchase: {
+            object_type: { type: String },
+            name: { type: String },
+            price: { type: Number },
+            description: { type: String },
+          },
+          event_participants: [{ type: ObjectId, ref: "Beings" }],
         },
       ],
       default: [],
@@ -197,6 +217,29 @@ const beingsSchema = new mongoose.Schema(
     new: { type: Boolean, default: true },
 
     traits: { type: [String], default: [] },
+
+    discovered_places: {
+      type: [
+        {
+          name: { type: String, required: true },
+          description: { type: String },
+          latitude: { type: Number, min: -90, max: 90 },
+          longitude: { type: Number, min: -180, max: 180 },
+        },
+      ],
+      default: [],
+    },
+    discovered_people: {
+      type: [
+        {
+          first_name: { type: String, required: true },
+          last_name: { type: String },
+          description: { type: String },
+          occupation: { type: String },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
@@ -224,6 +267,11 @@ export interface IPlannedAction {
   health_impact?: number;
   vibe_impact?: number;
   wealth_impact?: number;
+  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event";
+  discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
+  discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
+  purchase?: { object_type: string; name: string; price: number; description?: string };
+  event_participants?: (mongoose.Types.ObjectId | string)[];
 }
 
 export interface IQuest {
@@ -323,6 +371,8 @@ export interface IBeing extends mongoose.Document {
   is_episodic?: boolean;
   new?: boolean;
   traits?: string[];
+  discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   createdAt?: Date;
   updatedAt?: Date;
 }

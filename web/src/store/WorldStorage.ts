@@ -40,6 +40,10 @@ interface WorldState {
   setShowCalendarPopup: (show: boolean) => void;
   showEntitiesPopup: boolean;
   setShowEntitiesPopup: (show: boolean) => void;
+  showDiscoveriesPopup: boolean;
+  setShowDiscoveriesPopup: (show: boolean) => void;
+  showDiscoveriesOnMap: boolean;
+  setShowDiscoveriesOnMap: (show: boolean) => void;
 
   showChatDialog: boolean;
   chatDialogData: ChatDialogData | null;
@@ -66,6 +70,9 @@ interface WorldState {
       current_place?: string;
       current_city?: string;
       current_country?: string;
+      discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+      discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
+      wealth_index?: number;
     }>
   ) => void;
   applyQueueUpdate: (playerQueue: IPlannedAction[]) => void;
@@ -126,6 +133,10 @@ const useWorldStorage = create<WorldState>()(
       setShowCalendarPopup: (show) => set({ showCalendarPopup: show }),
       showEntitiesPopup: false,
       setShowEntitiesPopup: (show) => set({ showEntitiesPopup: show }),
+      showDiscoveriesPopup: false,
+      setShowDiscoveriesPopup: (show) => set({ showDiscoveriesPopup: show }),
+      showDiscoveriesOnMap: false,
+      setShowDiscoveriesOnMap: (show) => set({ showDiscoveriesOnMap: show }),
 
       showChatDialog: false,
       chatDialogData: null,
@@ -168,6 +179,9 @@ const useWorldStorage = create<WorldState>()(
                   current_place: u.current_place,
                   current_city: u.current_city,
                   current_country: u.current_country,
+                  discovered_places: u.discovered_places ?? npc.discovered_places,
+                  discovered_people: u.discovered_people ?? npc.discovered_people,
+                  wealth_index: u.wealth_index ?? npc.wealth_index,
                 }
               : npc;
           }),
@@ -215,6 +229,7 @@ const useWorldStorage = create<WorldState>()(
       partialize: (state) => ({
         is3DView: state.is3DView,
         pinnedStats: state.pinnedStats,
+        showDiscoveriesOnMap: state.showDiscoveriesOnMap,
       }),
     }
   )

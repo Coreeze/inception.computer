@@ -68,7 +68,7 @@ async function runTick(characterID: string) {
   }
 
   loop.inFlight = true;
-  let nextDelay = 6000;
+  let nextDelay = 2000;
 
   try {
     const character = await Being.findById(characterID);
@@ -83,7 +83,7 @@ async function runTick(characterID: string) {
       return;
     }
 
-    nextDelay = sandbox.day_duration_ms || 6000;
+    nextDelay = sandbox.day_duration_ms || 2000;
 
     if (character.active_heartbeat_id) {
       const pendingChoice = getChoice(character.active_heartbeat_id);

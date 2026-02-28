@@ -17,21 +17,16 @@ interface CompletionOptions {
   model?: ModelTier;
   systemPrompt?: string;
   userPrompt: string;
-  temperature?: number;
   maxTokens?: number;
-  jsonMode?: boolean;
 }
 
-export async function complete({
+export async function completeJSON<T = Record<string, any>>({
   model = "fast",
   systemPrompt,
   userPrompt,
-  temperature = 0.7,
   maxTokens = 2048,
-  jsonMode = false,
-}: CompletionOptions): Promise<string> {
+}: CompletionOptions): Promise<T> {
   const messages: OpenAI.ChatCompletionMessageParam[] = [];
-
   if (systemPrompt) {
     messages.push({ role: "system", content: systemPrompt });
   }
@@ -40,30 +35,11 @@ export async function complete({
   const response = await openrouter.chat.completions.create({
     model: MODELS[model],
     messages,
-    temperature,
     max_tokens: maxTokens,
-    ...(jsonMode && { response_format: { type: "json_object" } }),
+    response_format: { type: "json_object" },
   });
 
-  return response.choices[0]?.message?.content || "";
-}
-
-export async function completeJSON<T = Record<string, any>>({
-  model = "fast",
-  systemPrompt,
-  userPrompt,
-  temperature = 0.4,
-  maxTokens = 2048,
-}: Omit<CompletionOptions, "jsonMode">): Promise<T> {
-  const raw = await complete({
-    model,
-    systemPrompt,
-    userPrompt,
-    temperature,
-    maxTokens,
-    jsonMode: true,
-  });
-
+  const raw = response.choices[0]?.message?.content || "";
   try {
     return JSON.parse(raw) as T;
   } catch {

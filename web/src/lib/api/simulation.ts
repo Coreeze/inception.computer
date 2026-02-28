@@ -1,6 +1,6 @@
 import { apiFetch, getPlayerID } from "./index";
 
-export async function initializeWorld(params: {
+export async function initializeSandbox(params: {
   first_name: string;
   last_name: string;
   soul_md?: string;
@@ -20,10 +20,7 @@ export async function initializeWorld(params: {
   });
 }
 
-export async function postHeartbeat(
-  characterID: string,
-  action: "play" | "pause"
-) {
+export async function postHeartbeat(characterID: string, action: "play" | "pause") {
   return apiFetch("/sandbox-runtime/heartbeat", {
     method: "POST",
     body: JSON.stringify({
@@ -34,10 +31,7 @@ export async function postHeartbeat(
   });
 }
 
-export async function resolveChoice(
-  characterID: string,
-  choice: "option_a" | "option_b" | "ignore" | { freeform: string }
-) {
+export async function resolveChoice(characterID: string, choice: "option_a" | "option_b" | "ignore" | { freeform: string }) {
   return apiFetch("/sandbox-runtime/resolve-choice", {
     method: "POST",
     body: JSON.stringify({

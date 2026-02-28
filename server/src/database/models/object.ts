@@ -9,7 +9,7 @@ const objectSchema = new mongoose.Schema(
     description: { type: String },
     properties: { type: Object },
     owner: { type: ObjectId, refPath: "ownerType", default: null },
-    ownerType: { type: String, enum: ["character", "entity"], default: null },
+    ownerType: { type: String, enum: ["character", "entity", "npc"], default: null },
     purchaseable: { type: Boolean, default: false },
     purchase_price: { type: Number, default: 0 },
     longitude: { type: Number, min: -180, max: 180 },

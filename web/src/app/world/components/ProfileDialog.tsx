@@ -112,6 +112,48 @@ export default function ProfileDialog() {
               <p className="mt-1">{c.description}</p>
             </div>
           )}
+
+          {!isPlayer && (
+            <div>
+              <span className="text-black/50 text-xs">Discovered places</span>
+              {c.discovered_places && c.discovered_places.length > 0 ? (
+                <ul className="mt-1 space-y-1">
+                  {c.discovered_places.map((p, i) => (
+                    <li key={i} className="rounded-lg bg-white/60 px-2 py-1 text-xs">
+                      <strong>{p.name}</strong>
+                      {p.description && <span className="text-black/60"> — {p.description}</span>}
+                      {p.latitude != null && p.longitude != null && (
+                        <span className="block text-black/40">
+                          {p.latitude.toFixed(2)}, {p.longitude.toFixed(2)}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs text-black/40">None yet</p>
+              )}
+            </div>
+          )}
+
+          {!isPlayer && (
+            <div>
+              <span className="text-black/50 text-xs">Discovered people</span>
+              {c.discovered_people && c.discovered_people.length > 0 ? (
+                <ul className="mt-1 space-y-1">
+                  {c.discovered_people.map((p, i) => (
+                    <li key={i} className="rounded-lg bg-white/60 px-2 py-1 text-xs">
+                      <strong>{p.first_name} {p.last_name || ""}</strong>
+                      {p.occupation && <span className="text-black/60"> — {p.occupation}</span>}
+                      {p.description && <span className="block text-black/50">{p.description}</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs text-black/40">None yet</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

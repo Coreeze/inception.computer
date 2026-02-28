@@ -36,7 +36,7 @@ export default function SimulationTimeBar({ showControls = true }: SimulationTim
     return `${DAYS_SHORT[d.getDay()]}, ${getOrdinal(d.getDate())} ${MONTHS_SHORT[d.getMonth()]}`;
   }, [sandbox?.current_year, sandbox?.current_month, sandbox?.current_day]);
 
-  const dayDurationMs = sandbox?.day_duration_ms ?? 6000;
+  const dayDurationMs = sandbox?.day_duration_ms ?? 2000;
   const isPlaying = runtimeStatus.runtimeState === "playing";
 
   useEffect(() => {

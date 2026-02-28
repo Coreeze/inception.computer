@@ -1,10 +1,14 @@
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 
+import "./worldStyles";
+
+const DEFAULT_ARTWORK_STYLE = "68d2400c61cd0dea7526beff";
+
 const sandboxSchema = new mongoose.Schema(
   {
     user: { type: ObjectId, ref: "Users", required: true },
-    artwork_style: { type: String, ref: "WorldStyles", required: true },
+    artwork_style: { type: String, ref: "WorldStyles", default: DEFAULT_ARTWORK_STYLE },
 
     start_year: { type: Number, required: true, default: 2026 },
     start_month: { type: Number, required: true, min: 1, max: 12, default: 1 },
@@ -15,7 +19,7 @@ const sandboxSchema = new mongoose.Schema(
     current_day: { type: Number, required: true, min: 1, max: 31, default: 1 },
 
     currency: { type: String },
-    day_duration_ms: { type: Number, required: true, default: 6000 },
+    day_duration_ms: { type: Number, required: true, default: 2000 },
     heartbeat_count: { type: Number, default: 0 },
     last_heartbeat_at: { type: Date },
     days_since_last_signal: { type: Number, default: 0 },
@@ -31,6 +35,11 @@ const sandboxSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+sandboxSchema.pre("save", function (next) {
+  if (!this.artwork_style) this.artwork_style = DEFAULT_ARTWORK_STYLE;
+  next();
+});
 
 sandboxSchema.index({ user: 1 });
 

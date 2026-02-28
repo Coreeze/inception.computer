@@ -1,7 +1,7 @@
 export const DECAY_RATES = {
-  health: 0.3,
-  vibe: 0.5,
-  life_mission: 0.2,
+  health: 0,
+  vibe: 0,
+  life_mission: 0,
 };
 
 export const CHAT_CONTEXT_LENGTH = 20;

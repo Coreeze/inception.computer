@@ -12,6 +12,7 @@ import ChoicePresenter from "./components/ChoicePresenter";
 import SimulationTimeBar from "./components/SimulationTimeBar";
 import PeoplePopup from "./components/PeoplePopup";
 import ProfileDialog from "./components/ProfileDialog";
+import NPCDiscoveriesPopup from "./components/NPCDiscoveriesPopup";
 
 export default function WorldLayout({
   children,
@@ -161,6 +162,7 @@ export default function WorldLayout({
       {children}
       <PeoplePopup />
       <ProfileDialog />
+      <NPCDiscoveriesPopup />
 
       <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 flex w-full flex-col items-center gap-2 px-2 pb-4 md:max-w-[450px] md:left-1/2 md:-translate-x-1/2 md:px-0">
         {queuedChoices && (

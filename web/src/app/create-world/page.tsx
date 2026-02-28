@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { initializeWorld } from "@/lib/api/simulation";
+import { initializeSandbox } from "@/lib/api/simulation";
 import { setCharacterID } from "@/lib/api/index";
 
 export default function CreateWorldPage() {
@@ -27,7 +27,7 @@ export default function CreateWorldPage() {
     }
     setLoading(true);
     try {
-      const res = await initializeWorld({
+      const res = await initializeSandbox({
         first_name: first_name.trim(),
         last_name: last_name.trim(),
         soul_md: soul_md.trim() || undefined,
@@ -113,15 +113,10 @@ export default function CreateWorldPage() {
           className="w-full border border-black/20 rounded-lg px-4 py-2.5 text-sm bg-white resize-none"
         />
 
-        {error && (
-          <p className="text-sm text-red-600">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <Link
-            href="/"
-            className="flex-1 border border-black/20 rounded-lg px-4 py-2.5 text-sm text-center"
-          >
+          <Link href="/" className="flex-1 border border-black/20 rounded-lg px-4 py-2.5 text-sm text-center">
             Back
           </Link>
           <button

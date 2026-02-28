@@ -78,6 +78,8 @@ export interface IBeing {
   is_episodic?: boolean;
   new?: boolean;
   traits?: string[];
+  discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   createdAt?: string;
   updatedAt?: string;
 }

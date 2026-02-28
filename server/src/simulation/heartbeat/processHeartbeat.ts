@@ -1,6 +1,8 @@
 import { ObjectId } from "mongodb";
-import { IBeing } from "../../database/models/being";
+import { IBeing, IPlannedAction } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
+import { ObjectModel } from "../../database/models/object";
+import { Event } from "../../database/models/event";
 import {
   MilestoneEvent,
   broadcastHeartbeat,
@@ -8,6 +10,84 @@ import {
 import { StatusPraesens, interpretBeingStats } from "./statusPraesens";
 import { checkSignals } from "./signals";
 import { generateChoices } from "./generateChoices";
+
+async function processNPCAction(
+  npc: IBeing,
+  action: IPlannedAction,
+  character: IBeing,
+  sandbox: ISandboxDocument,
+  npcs: IBeing[],
+  dateStr: string
+): Promise<void> {
+  const actionType = action.action_type || "move";
+
+  if (actionType === "discover_place" && action.discovery_place) {
+    const dp = action.discovery_place;
+    const places = npc.discovered_places || [];
+    places.push({
+      name: dp.name,
+      description: dp.description,
+      latitude: dp.latitude ?? action.latitude,
+      longitude: dp.longitude ?? action.longitude,
+    });
+    npc.discovered_places = places;
+  }
+
+  if (actionType === "discover_person" && action.discovery_person) {
+    const dperson = action.discovery_person;
+    const people = npc.discovered_people || [];
+    people.push({
+      first_name: dperson.first_name,
+      last_name: dperson.last_name,
+      description: dperson.description,
+      occupation: dperson.occupation,
+    });
+    npc.discovered_people = people;
+  }
+
+  if (actionType === "buy" && action.purchase) {
+    const p = action.purchase;
+    const wealth = npc.wealth_index ?? 0;
+    if (wealth >= p.price) {
+      await ObjectModel.create({
+        sandbox: sandbox._id,
+        name: p.name,
+        type: p.object_type,
+        description: p.description,
+        owner: npc._id,
+        ownerType: "npc",
+        purchase_price: p.price,
+      });
+      npc.wealth_index = wealth - p.price;
+    }
+  }
+
+  if (actionType === "event") {
+    const participantIds = [npc._id, ...(action.event_participants || [])];
+    const participantNames = [
+      `${npc.first_name} ${npc.last_name}`,
+      ...(action.event_participants || []).map((id) => {
+        const found = npcs.find((n) => n._id.toString() === id.toString());
+        return found ? `${found.first_name} ${found.last_name}` : "Unknown";
+      }),
+    ];
+    await Event.create({
+      character: character._id,
+      user: character.user,
+      category: "mundane",
+      sim_year: sandbox.current_year,
+      sim_month: sandbox.current_month,
+      sim_day: sandbox.current_day,
+      title: `${npc.first_name} ${npc.last_name} - ${action.action}`,
+      description: action.reason,
+      longitude: action.longitude,
+      latitude: action.latitude,
+      location_name: action.place,
+      participants: participantIds,
+      participant_names: participantNames,
+    });
+  }
+}
 
 export interface NPCUpdate {
   npcId: string;
@@ -17,6 +97,9 @@ export interface NPCUpdate {
   current_place: string | undefined;
   current_city: string | undefined;
   current_country: string | undefined;
+  discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
+  wealth_index?: number;
 }
 
 export interface HeartbeatResult {
@@ -152,8 +235,9 @@ export async function processHeartbeat(
   const npcUpdates: NPCUpdate[] = [];
   for (const npc of npcs) {
     if (npc.ai_action_queue?.length) {
-      const action = npc.ai_action_queue.shift();
+      const action = npc.ai_action_queue.shift() as IPlannedAction | undefined;
       if (action) {
+        await processNPCAction(npc, action, character, sandbox, npcs, dateStr);
         npc.current_action = action.action;
         npc.current_longitude = action.longitude ?? npc.current_longitude;
         npc.current_latitude = action.latitude ?? npc.current_latitude;
@@ -173,6 +257,9 @@ export async function processHeartbeat(
       current_place: npc.current_place,
       current_city: npc.current_city,
       current_country: npc.current_country,
+      discovered_places: npc.discovered_places,
+      discovered_people: npc.discovered_people,
+      wealth_index: npc.wealth_index,
     });
     await npc.save();
   }

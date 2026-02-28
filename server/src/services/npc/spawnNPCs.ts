@@ -38,14 +38,13 @@ export async function spawnNPCs({
 }): Promise<IBeing[]> {
   const response = await completeJSON<{ npcs: SpawnedNPC[] }>({
     model: "fast",
-    systemPrompt: `You generate diverse NPCs for a life simulation. All are strangers to the player.
-    Return JSON: { "npcs": [{ "first_name", "last_name", "occupation", "relationship_to_main_character": "stranger", "relationship_index": 0, "soul_md": "2 sentences about personality", "life_md": "2 sentences about current life", "home_city", "home_country", "home_longitude", "home_latitude" }] }
+    systemPrompt: `You generate diverse NPCs for a life simulation.
+    Return JSON: { "npcs": [{ "first_name", "last_name", "occupation", "relationship_to_main_character", "relationship_index", "soul_md": "2 sentences about personality", "life_md": "2 sentences about current life", "home_city", "home_country", "home_longitude", "home_latitude" }] }
     Coordinates must be near ${playerCity}, ${playerCountry}. Use real places. Longitude -180 to 180, latitude -90 to 90.`,
     userPrompt: `Generate exactly ${count} diverse NPCs living in or near ${playerCity}, ${playerCountry}. 
     Mix occupations: barista, teacher, artist, nurse, developer, chef, etc.
     Each has a distinct personality (soul_md) and current situation (life_md).
     Spread them across different neighborhoods. Player is at (${playerLon}, ${playerLat}).`,
-    temperature: 0.8,
     maxTokens: 4096,
   });
 
