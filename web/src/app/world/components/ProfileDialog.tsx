@@ -1,12 +1,14 @@
 "use client";
 
 import useWorldStorage from "@/store/WorldStorage";
+import useSimulationStorage from "@/store/SimulationStorage";
 import formatCurrency from "@/lib/formatCurrency";
 
 export default function ProfileDialog() {
   const showProfileDialog = useWorldStorage((s) => s.showProfileDialog);
   const profileCharacter = useWorldStorage((s) => s.profileCharacter);
   const closeProfile = useWorldStorage((s) => s.closeProfile);
+  const sandbox = useSimulationStorage((s) => s.sandbox);
 
   if (!showProfileDialog || !profileCharacter) return null;
 
@@ -40,29 +42,55 @@ export default function ProfileDialog() {
         </div>
         <div className="space-y-4 p-4 font-mono text-sm">
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-black/50">Occupation</span>
-              <p>{c.occupation || "—"}</p>
-            </div>
+            {c.occupation && (
+              <div>
+                <span className="text-black/50">Occupation</span>
+                <p>{c.occupation}</p>
+              </div>
+            )}
             <div>
               <span className="text-black/50">Relationship</span>
               <p>{c.relationship_to_main_character || "stranger"}</p>
             </div>
-            <div>
-              <span className="text-black/50">Health</span>
-              <p>{c.health_index ?? "—"}</p>
-            </div>
-            <div>
-              <span className="text-black/50">Vibe</span>
-              <p>{c.vibe_index ?? "—"}</p>
-            </div>
-            <div>
-              <span className="text-black/50">Wealth</span>
-              <p>{c.wealth_index != null ? formatCurrency(c.wealth_index) : "—"}</p>
-            </div>
+            {c.health_index != null && (
+              <div>
+                <span className="text-black/50">health_index</span>
+                <p>{c.health_index}</p>
+              </div>
+            )}
+            {c.vibe_index != null && (
+              <div>
+                <span className="text-black/50">vibe_index</span>
+                <p>{c.vibe_index}</p>
+              </div>
+            )}
+            {c.wealth_index != null && (
+              <div>
+                <span className="text-black/50">wealth</span>
+                <p>
+                  {formatCurrency(c.wealth_index)}
+                  {sandbox?.currency ? ` ${sandbox.currency}` : ""}
+                </p>
+              </div>
+            )}
+            {c.monthly_expenses != null && (
+              <div>
+                <span className="text-black/50">Monthly expenses</span>
+                <p>
+                  {formatCurrency(c.monthly_expenses)}
+                  {sandbox?.currency ? ` ${sandbox.currency}` : ""}
+                </p>
+              </div>
+            )}
+            {sandbox?.currency && (
+              <div>
+                <span className="text-black/50">Currency</span>
+                <p>{sandbox.currency}</p>
+              </div>
+            )}
             {c.life_mission && (
               <div>
-                <span className="text-black/50">Mission</span>
+                <span className="text-black/50">Life mission</span>
                 <p>{c.life_mission.name} ({c.life_mission.progress})</p>
               </div>
             )}
