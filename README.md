@@ -41,6 +41,24 @@ cd server && npm install && npm run dev
 cd web && npm install && npm run dev
 ```
 
+## Deployment
+
+### Vercel (web)
+
+1. Set **Root Directory** to `web/` in Vercel project settings
+2. Add environment variables:
+   - `NEXT_PUBLIC_MAPBOX_TOKEN` — your Mapbox public token
+   - `NEXT_PUBLIC_SERVER_URL` — your server URL (e.g. `https://api.inception.computer`)
+
+### DigitalOcean App Platform (server)
+
+1. Set **Source Directory** to `/server`
+2. Add environment variables:
+   - `PORT` — defaults to 8080
+   - `MONGO_URI` — MongoDB connection string
+   - `OPENROUTER_API_KEY` — OpenRouter API key
+   - `FAL_KEY` — Fal.ai API key
+
 ## Stack
 
 | Layer        | Technology                                  |

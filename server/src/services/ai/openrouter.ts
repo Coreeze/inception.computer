@@ -1,14 +1,14 @@
 import OpenAI from "openai";
 
 const openrouter = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
+  baseURL: "https://resource-ties-purposes-receives.trycloudflare.com/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 export const MODELS = {
-  fast: "mistralai/ministral-14b-instruct-2512",
-  smart: "mistralai/ministral-14b-instruct-2512",
-  reasoning: "mistralai/ministral-14b-instruct-2512",
+  fast: "mistralai/Ministral-3-14B-Instruct-2512",
+  smart: "mistralai/Ministral-3-14B-Instruct-2512",
+  reasoning: "mistralai/Ministral-3-14B-Instruct-2512",
 } as const;
 
 type ModelTier = keyof typeof MODELS;
