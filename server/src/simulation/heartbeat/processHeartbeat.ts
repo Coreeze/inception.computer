@@ -14,6 +14,17 @@ interface EntityCollector {
   newPlaces: any[];
 }
 
+const VALID_PET_MODES = new Set(["meet", "buy", "adopt"]);
+
+function sanitizeQueuePets(queue: IPlannedAction[] | undefined): void {
+  if (!queue) return;
+  for (const action of queue) {
+    if (action.pet && !VALID_PET_MODES.has(action.pet.acquisition_mode || "")) {
+      action.pet.acquisition_mode = "adopt";
+    }
+  }
+}
+
 async function processBeingAction(
   being: IBeing,
   action: IPlannedAction,
@@ -442,6 +453,10 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
 
   const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
   const collector: EntityCollector = { newNpcs: [], newPlaces: [] };
+
+  sanitizeQueuePets(character.player_action_queue);
+  sanitizeQueuePets(character.ai_action_queue);
+  for (const npc of npcs) sanitizeQueuePets(npc.ai_action_queue);
 
   let charAction: IPlannedAction | undefined;
   if (character.player_action_queue?.length) {

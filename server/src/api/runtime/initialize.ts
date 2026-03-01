@@ -38,9 +38,8 @@ export const initializeEndpoint = async (req: Request, res: Response) => {
     }>({
       model: "fast",
       systemPrompt:
-        "You are a world generator. You generate a world for a life simulation. Return JSON: { home_longitude: number, home_latitude: number, currency: string, wealth_index: number, monthly_income: number, monthly_expenses: number }",
-      userPrompt:
-        "Generate a world for a life simulation. The home_longitude and home_latitude must be realistic coordinates. wealth_index is absolute cash value in the currency. monthly_income is the average monthly income in the currency. monthly_expenses is the average monthly expenses in the currency.",
+        "Return JSON: {home_longitude,home_latitude,currency,wealth_index,monthly_income,monthly_expenses}. Coordinates must be real for the given city. wealth_index=cash on hand. All money values in local currency.",
+      userPrompt: `City: ${home_city}, ${home_country}. Return realistic coordinates for this city, local currency, and plausible financial values.`,
     });
 
     const sandbox = await Sandbox.create({

@@ -173,7 +173,7 @@ export default function Globe() {
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/standard",
       center: [2.3522, 48.8566],
-      zoom: 12,
+      zoom: 2,
       projection: "globe",
       pitch: is3DView ? 45 : 0,
     });
@@ -305,10 +305,12 @@ export default function Globe() {
       </div>
     `);
 
-    characterMarker.current = new mapboxgl.Marker({ element: el })
-      .setLngLat([character.current_longitude, character.current_latitude])
-      .setPopup(popup)
-      .addTo(map.current);
+    if (character.current_longitude != null && character.current_latitude != null) {
+      characterMarker.current = new mapboxgl.Marker({ element: el })
+        .setLngLat([character.current_longitude, character.current_latitude])
+        .setPopup(popup)
+        .addTo(map.current);
+    }
   }, [character, mapLoaded]);
 
   useEffect(() => {
@@ -346,7 +348,9 @@ export default function Globe() {
           <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
           <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
           <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
-          <button data-open-profile data-npc-id="${npc._id}" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
+          <button data-open-profile data-npc-id="${
+            npc._id
+          }" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
             View profile
           </button>
         </div>
