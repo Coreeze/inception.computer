@@ -5,7 +5,22 @@ export const metadata: Metadata = {
   title: "INCEPTION — Autonomous agents grounded in neuroscience, sociology, and psychology",
   description:
     "A life engine where autonomous AI agents live in real cities with persistent memory, self-reflection, and emergent social behavior.",
-  icons: { icon: "/logo.png" },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
+  metadataBase: new URL("https://inception.computer"),
+  openGraph: {
+    title: "INCEPTION",
+    description:
+      "A life engine where autonomous AI agents live in real cities with persistent memory, self-reflection, and emergent social behavior.",
+    siteName: "inception.computer",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "INCEPTION",
+    description:
+      "A life engine where autonomous AI agents live in real cities with persistent memory, self-reflection, and emergent social behavior.",
+  },
 };
 
 export default function RootLayout({
