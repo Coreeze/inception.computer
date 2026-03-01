@@ -70,8 +70,16 @@ const COMPRESSED_PLANNER_CONSTITUTION = `
 - Behavior must follow human drives: belonging, safety, status, purpose, resources.
 - Use neuroscience balance: attachment, reward prediction, stress regulation, habit loops, social homeostasis.
 - Discoveries are natural and uncapped when context supports them; avoid artificial numeric limits.
+- Use action_type "move" only when revisiting a known location with no new interactions.
+- Each discovered person must be a unique, plausible individual with a real name and occupation.
+- Each discovered place must be a specific real-world place with plausible nearby coordinates.
 - Relationships evolve gradually; include social network effects (introductions, trust, reputation, conflict, repair).
+- Marriage and parenting are plausible only when relationship context supports them.
+- Family duties (visits, weddings, caregiving) can motivate local or international travel.
+- Last-name changes are optional and only occur in marriage context.
 - Economic life must be plausible: earn/spend/save/borrow/invest/build/close businesses under constraints.
+- Purchases should occur when context supports them (groceries, equipment, gifts, etc.).
+- Occupation changes are allowed only when career continuity is plausible.
 - Major transitions require plausibility checks: temporal, geographic, social-psychological, economic, life-stage.
 - Prefer plausible adaptation over invalid jumps; if implausible, pivot to nearest valid action.
 - Maintain continuity and inertia; no abrupt identity/personality oscillations without triggers.
@@ -79,6 +87,47 @@ const COMPRESSED_PLANNER_CONSTITUTION = `
 - Log major transitions deterministically with provenance (who/what/where/why/when/source).
 - Output strict schema-valid JSON only; never emit malformed required fields.
 `.trim();
+
+const PLANNER_SYSTEM_PROMPT =
+  "You generate realistic weekly plans for beings in a life simulation. Return strict schema-valid JSON only.";
+
+const ACTION_RULES_BLOCK = `Rules for each action:
+1. Be realistic for personality, occupation, and life stage
+2. Include a specific destination with real coordinates
+3. Reflect real daily life; most days involve going somewhere new or meeting someone
+4. Use action_type precisely: discover_place (new place), discover_person (new person), buy (purchase), event (social gathering)
+5. If action_type is "buy", purchase.price must be a JSON number only
+6. If action_type is "marry", include family_membership.spouse_name and relationship_event:"marriage"
+7. If action_type is "child_birth", include family_membership.child_name and relationship_event:"child_birth"
+8. If action_type is "adopt_pet", include pet:{species,name,acquisition_mode}
+9. If action_type is "change_occupation", include occupation_change:{occupation}`;
+
+const ACTION_SCHEMA_BLOCK = `Action shape:
+{
+  "action": "...",
+  "reason": "...",
+  "city": "...",
+  "country": "...",
+  "place": "...",
+  "longitude": N,
+  "latitude": N,
+  "action_type"?: "move"|"discover_place"|"discover_person"|"buy"|"event"|"marry"|"child_birth"|"adopt_pet"|"change_occupation",
+  "discovery_place"?: { "name", "description", "latitude", "longitude" },
+  "discovery_person"?: { "first_name", "last_name", "description", "occupation" },
+  "purchase"?: { "object_type": "property"|"car"|"object", "name", "price", "description" },
+  "event_participants"?: ["npc_id"],
+  "name_change"?: { "last_name" },
+  "occupation_change"?: { "occupation" },
+  "relationship_event"?: "marriage"|"child_birth",
+  "family_membership"?: { "spouse_name"?, "child_name"? },
+  "pet"?: { "species", "name"?, "acquisition_mode"?: "meet"|"buy"|"adopt" }
+}`;
+
+const OUTPUT_FORMAT_BLOCK = `Output formatting:
+- action: first person, max 5 words, -ing verb
+- reason: first person, exactly 7 words
+- Return strict JSON only (no markdown/comments/trailing commas/single quotes/undefined)
+- Return minified JSON (single line)`;
 
 const KNOWN_ACTION_TYPES = new Set([
   "move",
@@ -195,11 +244,7 @@ function sanitizeWeeklyActions(actions: WeeklyPlanAction[] | undefined): WeeklyP
 }
 
 function compactSandboxContext(sandboxContext: any): any {
-  const places = Array.isArray(sandboxContext?.places)
-    ? sandboxContext.places.slice(0, 10)
-    : sandboxContext?.places
-      ? [sandboxContext.places]
-      : [];
+  const places = Array.isArray(sandboxContext?.places) ? sandboxContext.places.slice(0, 10) : sandboxContext?.places ? [sandboxContext.places] : [];
   const beings = Array.isArray(sandboxContext?.beings) ? sandboxContext.beings.slice(0, 20) : [];
   const events = Array.isArray(sandboxContext?.events) ? sandboxContext.events.slice(0, 12) : [];
 
@@ -312,78 +357,25 @@ ${JSON.stringify(npcDetails)}
 PLANNER CONSTITUTION:
 ${COMPRESSED_PLANNER_CONSTITUTION}
 
-NEUROSCIENCE-INSPIRED DECISION MODEL:
-Balance these drives when choosing each action:
-- Attachment: bonding, caregiving, belonging needs
-- Reward prediction: pursue expected emotional/social payoff
-- Stress regulation: avoid overload, seek recovery when depleted
-- Habit loops: anchor routine (sleep, work, meals) for stability
-- Social homeostasis: rebalance isolation vs connection
-
-LIFE-COURSE RULES:
-- Marriage and parenting are plausible when relationship context supports them
-- Family duties (visits, weddings, caregiving) can motivate local or international travel
-- NPCs may meet, buy, or adopt pets (unaware beings)
-- Occupation changes are allowed when context supports career continuity
-- Last-name changes only occur in marriage context and are optional
-- Avoid abrupt identity churn, implausible job switching, or impossible family timelines
-
-DISCOVERY IS NATURAL, NOT RARE:
-In real life, people constantly discover new places and meet new people as part of daily activity. Going to a new restaurant = discover_place. Meeting a colleague's friend = discover_person.
-- Discoveries should happen organically — do NOT artificially limit them
-- Only use action_type "move" for revisiting a known location with no new interactions
-- Each discovered person must be unique with a real name and occupation
-- Each discovered place must be specific with real coordinates
-
-Rules for each action:
-1. Be realistic for personality, occupation, and life stage
-2. Include a specific destination and real coordinates
-3. Reflect how a real person lives — most days involve going somewhere new or meeting someone
-4. Use action_type to accurately reflect what happens: discover_place for new spots, discover_person for meeting new people, buy for purchases, event for gatherings
-5. If action_type is "buy", purchase.price must be a JSON number only
-6. If action_type is "marry", include family_membership.spouse_name and relationship_event:"marriage"
-7. If action_type is "child_birth", include family_membership.child_name and relationship_event:"child_birth"
-8. If action_type is "adopt_pet", include pet:{species,name,acquisition_mode}
-9. If action_type is "change_occupation", include occupation_change:{occupation}
+${ACTION_RULES_BLOCK}
 
 Return JSON:
 {
   "plans": [
     {
       "npc_id": "...",
-      "actions": [
-        {
-          "action": "...",
-          "reason": "...",
-          "city": "...",
-          "country": "...",
-          "place": "...",
-          "longitude": N,
-          "latitude": N,
-          "action_type"?: "move"|"discover_place"|"discover_person"|"buy"|"event"|"marry"|"child_birth"|"adopt_pet"|"change_occupation",
-          "discovery_place"?: { "name", "description", "latitude", "longitude" },
-          "discovery_person"?: { "first_name", "last_name", "description", "occupation" },
-          "purchase"?: { "object_type": "property"|"car"|"object", "name", "price", "description" },
-          "event_participants"?: ["npc_id"],
-          "name_change"?: { "last_name": "..." },
-          "occupation_change"?: { "occupation": "..." },
-          "relationship_event"?: "marriage"|"child_birth",
-          "family_membership"?: { "spouse_name"?: "...", "child_name"?: "..." },
-          "pet"?: { "species": "...", "name"?: "...", "acquisition_mode"?: "meet"|"buy"|"adopt" }
-        }
-      ]
+      "actions": [/* Action shape below */]
     }
   ]
 }
 
-action: first person, max 5 words, -ing verbs.
-reason: first person, exactly 7 words.
-Return strict JSON only: no markdown, no comments, no trailing commas, no single quotes, no undefined.
-Return minified JSON (single line).`;
+${ACTION_SCHEMA_BLOCK}
+
+${OUTPUT_FORMAT_BLOCK}`;
 
   const response = await completeJSON<{ plans: BatchPlanEntry[] }>({
     model: "fast",
-    systemPrompt: "You generate realistic weekly plans for beings in a life simulation. Use neuroscience-inspired decision-making: balance attachment, reward prediction, stress regulation, habit loops, and social homeostasis.",
+    systemPrompt: PLANNER_SYSTEM_PROMPT,
     userPrompt: prompt,
     maxTokens: 4096,
   });
@@ -402,7 +394,7 @@ Return minified JSON (single line).`;
   return actionsByNpc;
 }
 
-export async function generateWeeklyPlan({
+async function generateBeingWeeklyPlan({
   npc,
   sandbox,
   otherNpcs = [],
@@ -423,13 +415,14 @@ export async function generateWeeklyPlan({
   const existingPeople = (npc.discovered_people || []).map((p) => `${p.first_name} ${p.last_name || ""}`).join(", ");
 
   const resolvedSandboxContext = sandboxContext || (await getSandboxContext(sandbox._id.toString(), npc._id.toString()));
+  const compactContext = compactSandboxContext(resolvedSandboxContext);
 
   const roleLabel = isMainCharacter ? "MAIN CHARACTER (free will active)" : "NPC";
 
   const prompt = `You are planning a week for a ${roleLabel} in a life simulation that emulates real life.
 
 Simulation context:
-${JSON.stringify(resolvedSandboxContext)}
+${JSON.stringify(compactContext)}
 
 ${roleLabel}:
 Name: ${npc.first_name} ${npc.last_name}
@@ -437,7 +430,11 @@ Occupation: ${npc.occupation || "Unknown"}
 Relationship status: ${npc.relationship_status || "Unknown"}
 Soul: ${npc.soul_md || "Unknown"}
 Life: ${(npc.life_md || "").slice(-300)}
-${isMainCharacter ? `Life mission: ${npc.life_mission?.name || "None"} (progress: ${npc.life_mission?.progress ?? 0})` : `Relationship to player: ${npc.relationship_to_main_character || "Unknown"}`}
+${
+  isMainCharacter
+    ? `Life mission: ${npc.life_mission?.name || "None"} (progress: ${npc.life_mission?.progress ?? 0})`
+    : `Relationship to player: ${npc.relationship_to_main_character || "Unknown"}`
+}
 Home: ${npc.home_city}, ${npc.home_country} (${npc.home_longitude}, ${npc.home_latitude})
 Current location: ${npc.current_place || npc.current_city || "Unknown"}
 Current feeling: ${npc.current_feeling || "Unknown"}
@@ -450,53 +447,61 @@ DATE: ${sandbox.current_month}/${sandbox.current_day}/${sandbox.current_year}
 PLANNER CONSTITUTION:
 ${COMPRESSED_PLANNER_CONSTITUTION}
 
-NEUROSCIENCE-INSPIRED DECISION MODEL:
-Balance these drives when choosing each action:
-- Attachment: bonding, caregiving, belonging needs
-- Reward prediction: pursue expected emotional/social payoff
-- Stress regulation: avoid overload, seek recovery when depleted
-- Habit loops: anchor routine (sleep, work, meals) for stability
-- Social homeostasis: rebalance isolation vs connection
+Generate exactly 7 daily actions for this being.
 
-DISCOVERY IS NATURAL, NOT RARE:
-In real life, people constantly discover new places and meet new people as a natural part of daily activity. Going to a new restaurant = discover_place. Meeting a colleague's friend = discover_person. Visiting a new park = discover_place. Chatting with a barista = discover_person.
-- Discoveries should happen organically as part of routine, work, socializing, errands, and leisure
-- Do NOT artificially limit discoveries — use them whenever the action naturally involves a new place or person
-- Only use action_type "move" for revisiting a known location with no new interactions
-- The more socially active and exploratory a person's life, the more discoveries per week
-- Each discovered person must be a unique, plausible individual with a real name and occupation
-- Each discovered place must be a real, specific place with real coordinates near the action location
+${ACTION_RULES_BLOCK}
 
-LIFE-COURSE RULES:
-- Marriage and parenting are plausible when relationship context supports them
-- Family duties (visits, weddings, caregiving) can motivate local or international travel
-- Beings may meet, buy, or adopt pets (unaware beings)
-- Occupation changes are allowed when context supports career continuity
-- Last-name changes only occur in marriage context and are optional
-- Avoid abrupt identity churn, implausible job switching, or impossible family timelines
-- Purchases happen when context supports them (groceries, equipment, gifts, etc.)
+Return JSON: { "actions": [/* Action shape below */] }
 
-Generate 7 daily actions for this being's week. Each action should:
-1. Be realistic for personality, occupation, and life stage
-2. Include a specific real-world destination with real coordinates
-3. Reflect how a real person lives — most days involve going somewhere new or meeting someone
-4. Use action_type to accurately reflect what happens: discover_place when visiting a new spot, discover_person when meeting someone new, buy when purchasing, event when attending a social gathering
-5. If action_type is "buy", purchase.price must be a JSON number only
+${ACTION_SCHEMA_BLOCK}
 
-Return JSON: { "actions": [{ "action": "...", "reason": "...", "city": "...", "country": "...", "place": "...", "longitude": N, "latitude": N, "action_type"?: "move"|"discover_place"|"discover_person"|"buy"|"event"|"marry"|"child_birth"|"adopt_pet"|"change_occupation", "discovery_place"?: { "name", "description", "latitude", "longitude" }, "discovery_person"?: { "first_name", "last_name", "description", "occupation" }, "purchase"?: { "object_type", "name", "price", "description" }, "event_participants"?: ["npc_id"], "name_change"?: { "last_name" }, "occupation_change"?: { "occupation" }, "relationship_event"?: "marriage"|"child_birth", "family_membership"?: { "spouse_name"?, "child_name"? }, "pet"?: { "species", "name"?, "acquisition_mode"?: "meet"|"buy"|"adopt" } }] }
-
-action: first person, max 5 words, -ing verbs.
-reason: first person, exactly 7 words.
-Return strict JSON only: no markdown, no comments, no trailing commas, no single quotes, no undefined.
-Return minified JSON (single line).`;
+${OUTPUT_FORMAT_BLOCK}`;
 
   const response = await completeJSON<{ actions: WeeklyPlanAction[] }>({
     model: "fast",
-    systemPrompt: "You generate realistic weekly plans for beings in a life simulation. Use neuroscience-inspired decision-making: balance attachment, reward prediction, stress regulation, habit loops, and social homeostasis.",
+    systemPrompt: PLANNER_SYSTEM_PROMPT,
     userPrompt: prompt,
   });
 
   return sanitizeWeeklyActions(response.actions).map((a) => toPlannedAction(a, sandbox, otherNpcs));
+}
+
+export async function generateMainWeeklyPlan({
+  mainCharacter,
+  sandbox,
+  otherNpcs = [],
+  sandboxContext,
+}: {
+  mainCharacter: IBeing;
+  sandbox: ISandboxDocument;
+  otherNpcs?: IBeing[];
+  sandboxContext?: any;
+}): Promise<IPlannedAction[]> {
+  return generateBeingWeeklyPlan({
+    npc: mainCharacter,
+    sandbox,
+    otherNpcs,
+    sandboxContext,
+  });
+}
+
+async function generateNPCWeeklyPlan({
+  npc,
+  sandbox,
+  otherNpcs = [],
+  sandboxContext,
+}: {
+  npc: IBeing;
+  sandbox: ISandboxDocument;
+  otherNpcs?: IBeing[];
+  sandboxContext?: any;
+}): Promise<IPlannedAction[]> {
+  return generateBeingWeeklyPlan({
+    npc,
+    sandbox,
+    otherNpcs,
+    sandboxContext,
+  });
 }
 
 export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocument }): Promise<IBeing[]> {
@@ -506,6 +511,7 @@ export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocume
     is_dead: { $ne: true },
     is_deleted: { $ne: true },
   });
+  const npcsNeedingRefill = npcs.filter((npc) => (npc.ai_action_queue?.length || 0) <= 7);
 
   const historyEntries: any[] = [];
   const updates: any[] = [];
@@ -518,13 +524,14 @@ export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocume
       is_dead: { $ne: true },
       is_deleted: { $ne: true },
     });
-    if (mainCharacter && (!mainCharacter.ai_action_queue || mainCharacter.ai_action_queue.length < 3)) {
+    if (mainCharacter && (!mainCharacter.ai_action_queue || mainCharacter.ai_action_queue.length <= 7)) {
       try {
-        const mainActions = await generateWeeklyPlan({
-          npc: mainCharacter,
+        const mainActions = await generateMainWeeklyPlan({
+          mainCharacter,
           sandbox,
           otherNpcs: npcs,
         });
+        console.log("Main character actions:", mainActions);
         const existingQueue = mainCharacter.ai_action_queue || [];
         const updatedQueue = [...mainActions, ...existingQueue].slice(0, MAX_AI_QUEUE_SIZE);
         mainCharacter.ai_action_queue = updatedQueue;
@@ -536,12 +543,13 @@ export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocume
   }
 
   if (npcs.length === 0) return [];
+  if (npcsNeedingRefill.length === 0) return npcs;
 
-  const sharedSandboxContext = await getSandboxContext(sandbox._id.toString(), npcs[0]._id.toString());
+  const sharedSandboxContext = await getSandboxContext(sandbox._id.toString(), npcsNeedingRefill[0]._id.toString());
 
   const batchSize = 4;
-  for (let i = 0; i < npcs.length; i += batchSize) {
-    const batch = npcs.slice(i, i + batchSize);
+  for (let i = 0; i < npcsNeedingRefill.length; i += batchSize) {
+    const batch = npcsNeedingRefill.slice(i, i + batchSize);
     let actionsByNpc = new Map<string, IPlannedAction[]>();
 
     try {
@@ -560,7 +568,7 @@ export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocume
 
       if (!newActions || newActions.length === 0) {
         try {
-          newActions = await generateWeeklyPlan({
+          newActions = await generateNPCWeeklyPlan({
             npc,
             sandbox,
             otherNpcs: npcs.filter((n) => !n._id.equals(npc._id)),
