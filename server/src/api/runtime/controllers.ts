@@ -39,6 +39,60 @@ async function resolveChatParticipants(playerID: string, characterID: string, np
   return { user, character, npc };
 }
 
+async function resolvePlayerAndCharacter(playerID: string, characterID: string) {
+  const user = await User.findOne({ player_id: playerID });
+  if (!user) {
+    throw new Error("Player not found");
+  }
+  const character = await Being.findById(characterID);
+  if (!character) {
+    throw new Error("Character not found");
+  }
+  if (character.user?.toString() !== user._id.toString()) {
+    throw new Error("Character does not belong to player");
+  }
+  return { user, character };
+}
+
+function buildBeingImagePrompt(being: any): string {
+  const details = [
+    `${(being.first_name || "").trim()} ${(being.last_name || "").trim()}`.trim(),
+    being.gender || "",
+    being.occupation || "",
+    being.description || "",
+    being.body_type || "",
+    being.skin_tone || "",
+    being.hair_color || "",
+    being.hair_type || "",
+    being.eye_color || "",
+    being.eye_emotions || "",
+    typeof being.glasses === "boolean" ? (being.glasses ? "wearing glasses" : "no glasses") : "",
+    being.current_city && being.current_country ? `living in ${being.current_city}, ${being.current_country}` : "",
+  ]
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  const fallback = "a human character portrait with visible full body and grounded everyday outfit";
+  return details.length > 0 ? details.join(", ") : fallback;
+}
+
+function buildPlaceImagePrompt(place: any): string {
+  const details = [
+    place.name || "",
+    place.type || "",
+    place.description || "",
+    place.city || "",
+    place.country || "",
+    place.appearance_prompt || "",
+    Array.isArray(place.tags) ? place.tags.join(", ") : "",
+  ]
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  const fallback = "an outdoor place in a life simulation world, realistic details and atmosphere";
+  return details.length > 0 ? details.join(", ") : fallback;
+}
+
 export const heartbeatEndpoint = async (req: Request, res: Response) => {
   try {
     const { playerID, characterID, action } = req.body;
@@ -293,6 +347,85 @@ export const generateChatImagePreviewEndpoint = async (req: Request, res: Respon
     if (message === "Player not found") return res.status(404).json({ error: message });
     if (message === "Character not found") return res.status(404).json({ error: message });
     if (message === "NPC not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
+  }
+};
+
+export const generateBeingImageEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, beingID } = req.body;
+    if (!playerID || !characterID || !beingID) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const { character } = await resolvePlayerAndCharacter(playerID, characterID);
+    const targetBeing =
+      character._id.toString() === beingID
+        ? character
+        : await Being.findOne({
+            _id: beingID,
+            main_character: character._id,
+            is_deleted: { $ne: true },
+            is_dead: { $ne: true },
+          });
+
+    if (!targetBeing) {
+      return res.status(404).json({ error: "Being not found" });
+    }
+
+    if (targetBeing.image_url) {
+      return res.json({ imageUrl: targetBeing.image_url });
+    }
+
+    const prompt = buildBeingImagePrompt(targetBeing);
+    const imageUrl = await generateFlux2FastImage(prompt, { imageSize: "portrait_16_9" });
+    targetBeing.image_url = imageUrl;
+    await targetBeing.save();
+
+    return res.json({ imageUrl });
+  } catch (error: any) {
+    console.error("Generate being image error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
+  }
+};
+
+export const generatePlaceImageEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, placeID } = req.body;
+    if (!playerID || !characterID || !placeID) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const { character } = await resolvePlayerAndCharacter(playerID, characterID);
+    const place = await Places.findOne({
+      _id: placeID,
+      main_character: character._id,
+    });
+
+    if (!place) {
+      return res.status(404).json({ error: "Place not found" });
+    }
+
+    if (place.image_url) {
+      return res.json({ imageUrl: place.image_url });
+    }
+
+    const prompt = buildPlaceImagePrompt(place);
+    const imageUrl = await generateFlux2FastImage(prompt, { imageSize: "portrait_16_9" });
+    place.image_url = imageUrl;
+    await place.save();
+
+    return res.json({ imageUrl });
+  } catch (error: any) {
+    console.error("Generate place image error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
     if (message === "Character does not belong to player") return res.status(403).json({ error: message });
     return res.status(400).json({ error: message });
   }

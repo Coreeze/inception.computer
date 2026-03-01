@@ -51,6 +51,28 @@ export async function generateChatImagePreview(characterID: string, npcID: strin
   });
 }
 
+export async function generateBeingImage(characterID: string, beingID: string) {
+  return apiFetch<{ imageUrl: string }>("/sandbox-runtime/being/image", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      beingID,
+    }),
+  });
+}
+
+export async function generatePlaceImage(characterID: string, placeID: string) {
+  return apiFetch<{ imageUrl: string }>("/sandbox-runtime/place/image", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      placeID,
+    }),
+  });
+}
+
 export async function loadMemories(characterID: string) {
   return apiFetch(`/sandbox/memories/${characterID}`);
 }

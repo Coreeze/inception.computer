@@ -41,9 +41,20 @@ export default function PeoplePopup() {
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {character && (
             <div className="mb-2 rounded-xl border border-red-200/50 bg-red-50/30 px-3 py-2">
-              <div className="font-mono text-sm font-medium">
-                {character.first_name} {character.last_name}
+              <div className="mb-2">
+                {character.image_url ? (
+                  <img
+                    src={character.image_url}
+                    alt={`${character.first_name || "You"} ${character.last_name || ""}`.trim()}
+                    className="h-24 w-full rounded-lg border border-black/10 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-full items-center justify-center rounded-lg border border-black/10 bg-white/50 text-[11px] text-black/50">
+                    No image yet
+                  </div>
+                )}
               </div>
+              <div className="font-mono text-sm font-medium">{character.first_name} {character.last_name}</div>
               <div className="text-[11px] text-black/50">You</div>
               {character.current_action && (
                 <div className="mt-1 text-[11px] text-black/60">
@@ -57,6 +68,19 @@ export default function PeoplePopup() {
               key={npc._id}
               className="mb-2 rounded-xl border border-black/10 bg-white px-3 py-2"
             >
+              <div className="mb-2">
+                {npc.image_url ? (
+                  <img
+                    src={npc.image_url}
+                    alt={`${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim()}
+                    className="h-24 w-full rounded-lg border border-black/10 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-full items-center justify-center rounded-lg border border-black/10 bg-black/5 text-[11px] text-black/50">
+                    No image yet
+                  </div>
+                )}
+              </div>
               <div className="font-mono text-sm font-medium">
                 {npc.first_name} {npc.last_name}
               </div>

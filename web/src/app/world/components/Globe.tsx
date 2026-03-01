@@ -7,7 +7,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import useWorldStorage from "@/store/WorldStorage";
 import useSimulationStorage from "@/store/SimulationStorage";
 import { setCharacterID } from "@/lib/api/index";
-import { generateWhatsHere, travelCharacter } from "@/lib/api/world";
+import { generateBeingImage, generateWhatsHere, travelCharacter } from "@/lib/api/world";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -46,11 +46,106 @@ export default function Globe() {
   const setShowDiscoveriesOnMap = useWorldStorage((s) => s.setShowDiscoveriesOnMap);
   const openProfile = useWorldStorage((s) => s.openProfile);
   const setCharacter = useWorldStorage((s) => s.setCharacter);
+  const updateBeingImage = useWorldStorage((s) => s.updateBeingImage);
   const mapPlaces = useWorldStorage((s) => s.mapPlaces);
   const sandbox = useSimulationStorage((s) => s.sandbox);
+  const generatingImageIds = useRef<Set<string>>(new Set());
+
+  const buildPopupAvatarHTML = (imageURL?: string, altLabel?: string, generateButtonHTML?: string) => {
+    const safeAlt = altLabel || "Character";
+    if (imageURL) {
+      return `<img src="${imageURL}" alt="${safeAlt}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;" />`;
+    }
+    return `
+      <div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#ebe7e0;color:#7a756d;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:38px;height:38px;opacity:0.9;">
+          <circle cx="12" cy="8" r="3.25"></circle>
+          <path d="M5.5 19c1.7-3 4.1-4.5 6.5-4.5s4.8 1.5 6.5 4.5"></path>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="3.5"></rect>
+        </svg>
+        <span style="margin-top:4px;font-size:10px;">No image</span>
+        ${generateButtonHTML || ""}
+      </div>
+    `;
+  };
+
+  const buildGenerateImageButtonHTML = (beingID: string, isMain: boolean, hasImage?: string) => {
+    if (hasImage) return "";
+    if (isMain) {
+      return `<button data-generate-main-image="1" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">Generate</button>`;
+    }
+    return `<button data-generate-image data-npc-id="${beingID}" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">Generate</button>`;
+  };
+
+  const createAvatarMarkerElement = (imageURL: string | undefined, borderColor: string, fallbackLabel: string) => {
+    const el = document.createElement("div");
+    el.style.cssText = `
+      width: 42px; height: 42px; border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid ${borderColor};
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center;
+      background: #ebe7e0;
+      color: #7a756d;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 20;
+    `;
+    if (imageURL) {
+      const img = document.createElement("img");
+      img.src = imageURL;
+      img.alt = fallbackLabel;
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;object-position:top;display:block;";
+      el.appendChild(img);
+    } else {
+      el.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:24px;height:24px;opacity:0.9;">
+          <circle cx="12" cy="8" r="3.25"></circle>
+          <path d="M5.5 19c1.7-3 4.1-4.5 6.5-4.5s4.8 1.5 6.5 4.5"></path>
+        </svg>
+      `;
+    }
+    return el;
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      const generateMainBtn = (e.target as HTMLElement).closest("[data-generate-main-image]");
+      if (generateMainBtn && character?._id && !character.image_url && !generatingImageIds.current.has(character._id)) {
+        generatingImageIds.current.add(character._id);
+        generateBeingImage(character._id, character._id)
+          .then((data) => {
+            if (data?.imageUrl) updateBeingImage(character._id, data.imageUrl);
+          })
+          .finally(() => {
+            generatingImageIds.current.delete(character._id);
+          });
+        return;
+      }
+
+      const generateNpcBtn = (e.target as HTMLElement).closest("[data-generate-image]");
+      if (generateNpcBtn && character?._id) {
+        const npcId = generateNpcBtn.getAttribute("data-npc-id");
+        if (npcId && !generatingImageIds.current.has(npcId)) {
+          generatingImageIds.current.add(npcId);
+          generateBeingImage(character._id, npcId)
+            .then((data) => {
+              if (data?.imageUrl) updateBeingImage(npcId, data.imageUrl);
+            })
+            .finally(() => {
+              generatingImageIds.current.delete(npcId);
+            });
+        }
+        return;
+      }
+
+      const mainBtn = (e.target as HTMLElement).closest("[data-open-main-profile]");
+      if (mainBtn && character) {
+        openProfile(character);
+        return;
+      }
       const btn = (e.target as HTMLElement).closest("[data-open-profile]");
       if (!btn) return;
       const id = btn.getAttribute("data-npc-id");
@@ -61,7 +156,7 @@ export default function Globe() {
     };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
-  }, [npcs, openProfile]);
+  }, [character, npcs, openProfile, updateBeingImage]);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -93,16 +188,20 @@ export default function Globe() {
           toMeaningfulText(props.text);
         if (!name) continue;
         const category =
-          toMeaningfulText(props.class) ||
-          toMeaningfulText(props.type) ||
-          toMeaningfulText(props.maki) ||
-          toMeaningfulText(props.category);
+          toMeaningfulText(props.class) || toMeaningfulText(props.type) || toMeaningfulText(props.maki) || toMeaningfulText(props.category);
         return category ? `${name} (${category})` : name;
       }
       return null;
     };
 
     const onMapClick = (e: mapboxgl.MapMouseEvent) => {
+      const clickTarget = e.originalEvent.target;
+      const clickedMarkerOrPopup = clickTarget instanceof Element ? clickTarget.closest(".mapboxgl-marker, .mapboxgl-popup") : null;
+      if (clickedMarkerOrPopup) {
+        clearClickedSelection();
+        return;
+      }
+
       const renderedFeatures = map.current?.queryRenderedFeatures(e.point) || [];
       const mapboxSummary = extractMapboxSummary(renderedFeatures);
       whatsHereRequestId.current += 1;
@@ -125,6 +224,7 @@ export default function Globe() {
             transform: rotate(-45deg);
             box-shadow: 0 2px 10px rgba(0,0,0,0.25);
             position: relative;
+            z-index: 10;
           `;
           const centerDot = document.createElement("div");
           centerDot.style.cssText = `
@@ -166,24 +266,49 @@ export default function Globe() {
   useEffect(() => {
     if (!map.current || !mapLoaded || !character) return;
 
+    const characterPopup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+        <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
+          ${buildPopupAvatarHTML(
+            character.image_url,
+            `${character.first_name || ""} ${character.last_name || ""}`.trim(),
+            buildGenerateImageButtonHTML(character._id, true, character.image_url)
+          )}
+        </div>
+        <span style="color: #7a756d;">${character.occupation || "Unknown occupation"}</span><br/>
+        <strong>${(character.first_name || "") + " " + (character.last_name || "")}</strong><br/>
+        <span style="color: #7a756d;">${character.current_action || "idle"}</span>
+        <button data-open-main-profile style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
+          View profile
+        </button>
+      </div>
+    `);
+
     if (!characterMarker.current) {
-      const el = document.createElement("div");
+      const el = createAvatarMarkerElement(
+        character.image_url,
+        "#ff1a1a",
+        `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
+      );
       el.className = "character-marker";
-      el.style.cssText = `
-        width: 52px; height: 52px; border-radius: 50%;
-        background: #ff1a1a; border: 3px solid #f9f7f3;
-        box-shadow: 0 0 20px rgba(255,26,26,0.5);
-        display: flex; align-items: center; justify-content: center;
-        color: #1a1714; font-weight: bold; font-size: 16px;
-        font-family: 'IBM Plex Mono', monospace;
-      `;
-      el.textContent = (character.first_name?.[0] || "?").toUpperCase();
 
       characterMarker.current = new mapboxgl.Marker({ element: el })
         .setLngLat([character.current_longitude, character.current_latitude])
+        .setPopup(characterPopup)
         .addTo(map.current);
     } else {
+      const markerEl = characterMarker.current.getElement();
+      markerEl.innerHTML = "";
+      const updated = createAvatarMarkerElement(
+        character.image_url,
+        "#ff1a1a",
+        `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
+      );
+      markerEl.style.cssText = updated.style.cssText;
+      markerEl.className = "character-marker";
+      markerEl.innerHTML = updated.innerHTML;
       characterMarker.current.setLngLat([character.current_longitude, character.current_latitude]);
+      characterMarker.current.setPopup(characterPopup);
     }
   }, [character, mapLoaded]);
 
@@ -203,49 +328,49 @@ export default function Globe() {
 
       const existing = npcMarkers.current.get(npc._id);
       if (existing) {
+        const markerEl = existing.getElement();
+        markerEl.innerHTML = "";
+        const updated = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
+        markerEl.style.cssText = updated.style.cssText;
+        markerEl.innerHTML = updated.innerHTML;
         existing.setLngLat([npc.current_longitude, npc.current_latitude]);
+        existing.setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(`
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+                <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
+                  ${buildPopupAvatarHTML(
+                    npc.image_url,
+                    `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
+                    buildGenerateImageButtonHTML(npc._id, false, npc.image_url)
+                  )}
+                </div>
+                <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
+                <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
+                <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
+                <button data-open-profile data-npc-id="${
+                  npc._id
+                }" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
+                  View profile
+                </button>
+              </div>
+            `)
+        );
       } else {
-        const el = document.createElement("div");
-        el.style.cssText = `
-          width: 36px; height: 36px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          cursor: pointer;
-        `;
-        const bubble = document.createElement("div");
-        bubble.style.cssText = `
-          width: 100%; height: 100%; border-radius: 50%;
-          background: #1a1714; border: 2px solid #d1cbc3;
-          display: flex; align-items: center; justify-content: center;
-          color: #d1cbc3; font-size: 12px; font-weight: 600;
-          font-family: 'IBM Plex Mono', monospace;
-          will-change: transform;
-        `;
-        bubble.textContent = (npc.first_name?.[0] || "?").toUpperCase();
-        el.appendChild(bubble);
-
-        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!prefersReducedMotion) {
-          const hash = npc._id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-          const driftX = 0.8 + (hash % 7) * 0.5;
-          const driftY = 0.8 + ((hash >> 2) % 7) * 0.5;
-          const duration = 1800 + (hash % 1500);
-          const delay = -(hash % duration);
-          bubble.animate(
-            [
-              { transform: "translate(0px, 0px)" },
-              { transform: `translate(${driftX}px, ${-driftY}px)` },
-              { transform: `translate(${-driftX * 0.8}px, ${driftY}px)` },
-              { transform: "translate(0px, 0px)" },
-            ],
-            { duration, delay, iterations: Infinity, easing: "ease-in-out" }
-          );
-        }
+        const el = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
 
         const marker = new mapboxgl.Marker({ element: el })
           .setLngLat([npc.current_longitude, npc.current_latitude])
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(`
               <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+                <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
+                  ${buildPopupAvatarHTML(
+                    npc.image_url,
+                    `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
+                    buildGenerateImageButtonHTML(npc._id, false, npc.image_url)
+                  )}
+                </div>
+                <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
                 <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
                 <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
                 <button data-open-profile data-npc-id="${
@@ -298,6 +423,7 @@ export default function Globe() {
               color: #1a1714; font-size: 10px; font-weight: 600;
               font-family: 'IBM Plex Mono', monospace; cursor: pointer;
               padding: 0 5px;
+              z-index: 5;
             `;
             el.textContent = "[P]";
 
@@ -338,6 +464,7 @@ export default function Globe() {
               color: #1a1714; font-size: 10px; font-weight: 600;
               font-family: 'IBM Plex Mono', monospace; cursor: pointer;
               padding: 0 5px;
+              z-index: 5;
             `;
             el.textContent = "[@]";
 
@@ -434,14 +561,8 @@ export default function Globe() {
     const offsetY = -26;
     const viewportWidth = mapContainer.current.clientWidth;
     const viewportHeight = mapContainer.current.clientHeight;
-    const x = Math.min(
-      Math.max(projected.x + offsetX, margin),
-      Math.max(margin, viewportWidth - panelWidth - margin)
-    );
-    const y = Math.min(
-      Math.max(projected.y + offsetY, margin),
-      Math.max(margin, viewportHeight - panelHeight - margin)
-    );
+    const x = Math.min(Math.max(projected.x + offsetX, margin), Math.max(margin, viewportWidth - panelWidth - margin));
+    const y = Math.min(Math.max(projected.y + offsetY, margin), Math.max(margin, viewportHeight - panelHeight - margin));
     setClickedPoint({ x, y });
   };
 
@@ -477,13 +598,7 @@ export default function Globe() {
     const requestLocation = { ...clickedLocation };
     setIsGeneratingWhatsHere(true);
 
-    generateWhatsHere(
-      character._id,
-      requestLocation.longitude,
-      requestLocation.latitude,
-      quickSummary,
-      lastMapboxSummary || undefined
-    )
+    generateWhatsHere(character._id, requestLocation.longitude, requestLocation.latitude, quickSummary, lastMapboxSummary || undefined)
       .then((result) => {
         if (whatsHereRequestId.current !== requestId) return;
         setLocationInfoLLM(result.description || null);
@@ -553,6 +668,11 @@ export default function Globe() {
 
   return (
     <>
+      <style jsx global>{`
+        .mapboxgl-popup {
+          z-index: 60 !important;
+        }
+      `}</style>
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* Status bar + People */}
@@ -642,10 +762,7 @@ export default function Globe() {
             </button>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={showWhatsHere}
-              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#fffefc] px-3 py-2 text-xs text-[#1a1714]"
-            >
+            <button onClick={showWhatsHere} className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#fffefc] px-3 py-2 text-xs text-[#1a1714]">
               whats here
             </button>
             <button

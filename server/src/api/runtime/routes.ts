@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
+  generateBeingImageEndpoint,
   generateChatImagePreviewEndpoint,
+  generatePlaceImageEndpoint,
   heartbeatEndpoint,
   resolveChoiceEndpoint,
   sendChatMessageEndpoint,
@@ -16,6 +18,8 @@ runtimeRouter.post("/sandbox-runtime/resolve-choice", resolveChoiceEndpoint);
 runtimeRouter.post("/sandbox-runtime/initialize", initializeEndpoint);
 runtimeRouter.post("/sandbox-runtime/chat/image-preview", generateChatImagePreviewEndpoint);
 runtimeRouter.post("/sandbox-runtime/chat", sendChatMessageEndpoint);
+runtimeRouter.post("/sandbox-runtime/being/image", generateBeingImageEndpoint);
+runtimeRouter.post("/sandbox-runtime/place/image", generatePlaceImageEndpoint);
 runtimeRouter.post("/sandbox-runtime/travel", travelCharacterEndpoint);
 runtimeRouter.post("/sandbox-runtime/whats-here", whatsHereEndpoint);
 

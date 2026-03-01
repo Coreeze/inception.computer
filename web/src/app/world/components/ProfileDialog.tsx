@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { generateBeingImage } from "@/lib/api/world";
 import useWorldStorage from "@/store/WorldStorage";
 import useSimulationStorage from "@/store/SimulationStorage";
 import formatCurrency from "@/lib/formatCurrency";
@@ -9,12 +11,34 @@ export default function ProfileDialog() {
   const profileCharacter = useWorldStorage((s) => s.profileCharacter);
   const closeProfile = useWorldStorage((s) => s.closeProfile);
   const openChatDialog = useWorldStorage((s) => s.openChatDialog);
+  const character = useWorldStorage((s) => s.character);
+  const updateBeingImage = useWorldStorage((s) => s.updateBeingImage);
   const sandbox = useSimulationStorage((s) => s.sandbox);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   if (!showProfileDialog || !profileCharacter) return null;
 
   const c = profileCharacter;
   const isPlayer = c.is_main;
+
+  const handleGenerateImage = async () => {
+    if (!character?._id || !c._id || c.image_url || isGeneratingImage) return;
+    setImageError(null);
+    setIsGeneratingImage(true);
+    try {
+      const data = await generateBeingImage(character._id, c._id);
+      if (data?.imageUrl) {
+        updateBeingImage(c._id, data.imageUrl);
+      } else {
+        setImageError("Image generation failed");
+      }
+    } catch (error: unknown) {
+      setImageError(error instanceof Error ? error.message : "Image generation failed");
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   return (
     <div
@@ -42,6 +66,44 @@ export default function ProfileDialog() {
           </button>
         </div>
         <div className="space-y-4 p-4 font-mono text-sm">
+          <div className="mx-auto w-full max-w-[280px]">
+            {c.image_url ? (
+              <img
+                src={c.image_url}
+                alt={`${c.first_name || "Character"} ${c.last_name || ""}`.trim()}
+                className="aspect-9/16 w-full rounded-xl border border-black/10 object-cover"
+              />
+            ) : (
+              <div className="space-y-2">
+                <div className="relative aspect-9/16 w-full rounded-xl border border-black/10 bg-white/50">
+                  <div className="flex h-full w-full flex-col items-center justify-center text-black/40">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      className="h-12 w-12"
+                    >
+                      <circle cx="12" cy="8" r="3.25" />
+                      <path d="M5.5 19c1.7-3 4.1-4.5 6.5-4.5s4.8 1.5 6.5 4.5" />
+                      <rect x="2.5" y="2.5" width="19" height="19" rx="3.5" />
+                    </svg>
+                    <span className="mt-2 text-xs text-black/50">No profile image</span>
+                  </div>
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={isGeneratingImage || !character?._id}
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded border border-black/20 bg-[#f9f7f3] px-2 py-1 text-[10px] disabled:opacity-40"
+                  >
+                    {isGeneratingImage ? "Generating..." : "Generate"}
+                  </button>
+                </div>
+                {imageError && <p className="text-xs text-red-700">{imageError}</p>}
+              </div>
+            )}
+          </div>
+
           {!isPlayer && (
             <button
               onClick={() => openChatDialog({ npcID: c._id })}
@@ -58,10 +120,12 @@ export default function ProfileDialog() {
                 <p>{c.occupation}</p>
               </div>
             )}
-            <div>
-              <span className="text-black/50">Relationship</span>
-              <p>{c.relationship_to_main_character || "stranger"}</p>
-            </div>
+            {!isPlayer && (
+              <div>
+                <span className="text-black/50">Relationship</span>
+                <p>{c.relationship_to_main_character || "stranger"}</p>
+              </div>
+            )}
             {c.health_index != null && (
               <div>
                 <span className="text-black/50">health_index</span>

@@ -11,7 +11,11 @@ interface FalImageResponse {
   };
 }
 
-export const IMAGE_STYLE_PREFIX = "stylezed sims 4 style, no text, no logos:";
+export const IMAGE_STYLE_PREFIX = "sims 4 style, realistic, head-to-toe photo no text, no logos:";
+
+interface GenerateFluxImageOptions {
+  imageSize?: string;
+}
 
 function extractFirstImageURL(payload: FalImageResponse): string | null {
   const directURL = payload.images?.[0]?.url;
@@ -21,7 +25,7 @@ function extractFirstImageURL(payload: FalImageResponse): string | null {
   return null;
 }
 
-export async function generateFlux2FastImage(prompt: string): Promise<string> {
+export async function generateFlux2FastImage(prompt: string, options?: GenerateFluxImageOptions): Promise<string> {
   const falKey = process.env.FAL_KEY;
   if (!falKey) {
     throw new Error("FAL_KEY is not configured");
@@ -37,7 +41,7 @@ export async function generateFlux2FastImage(prompt: string): Promise<string> {
     body: JSON.stringify({
       prompt: composedPrompt,
       num_images: 1,
-      image_size: "square_hd",
+      image_size: options?.imageSize || "portrait_16_9",
     }),
   });
 
