@@ -24,9 +24,9 @@ export interface IPlannedAction {
   health_impact?: number;
   vibe_impact?: number;
   wealth_impact?: number;
-  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
-  discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
-  discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
+  action_type?: "move" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
+  places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   purchase?: { object_type: string; name: string; price: number; description?: string };
   name_change?: { last_name: string };
   occupation_change?: { occupation: string };

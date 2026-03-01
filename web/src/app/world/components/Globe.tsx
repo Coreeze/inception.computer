@@ -35,6 +35,7 @@ export default function Globe() {
   const [lastMapboxSummary, setLastMapboxSummary] = useState<string | null>(null);
   const [autoGenerateWhatsHere, setAutoGenerateWhatsHere] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [followCharacter, setFollowCharacter] = useState(false);
 
   const character = useWorldStorage((s) => s.character);
   const triggerFocusCoordinates = useWorldStorage((s) => s.triggerFocusCoordinates);
@@ -515,6 +516,23 @@ export default function Globe() {
   }, [focusCharacterTrigger]);
 
   useEffect(() => {
+    if (!map.current || !followCharacter || !character) return;
+    map.current.easeTo({
+      center: [character.current_longitude, character.current_latitude],
+      duration: 800,
+    });
+  }, [followCharacter, character?.current_longitude, character?.current_latitude]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    const disableFollow = () => setFollowCharacter(false);
+    map.current.on("dragstart", disableFollow);
+    return () => {
+      map.current?.off("dragstart", disableFollow);
+    };
+  }, [mapLoaded]);
+
+  useEffect(() => {
     if (!map.current || focusLongitude == null || focusLatitude == null) return;
     map.current.flyTo({
       center: [focusLongitude, focusLatitude],
@@ -768,6 +786,24 @@ export default function Globe() {
             }`}
           >
             On map
+          </button>
+          <button
+            onClick={() => {
+              const next = !followCharacter;
+              setFollowCharacter(next);
+              if (next && map.current && character) {
+                map.current.flyTo({
+                  center: [character.current_longitude, character.current_latitude],
+                  zoom: 14,
+                  duration: 1000,
+                });
+              }
+            }}
+            className={`rounded-lg border px-3 py-1.5 font-mono text-xs backdrop-blur-sm ${
+              followCharacter ? "border-[#b91c1c] bg-[#dc2626]/20 text-[#b91c1c]" : "border-[#d1cbc3] bg-[#f9f7f3]/90 text-[#1a1714]"
+            }`}
+          >
+            Follow
           </button>
           <button
             onClick={toggleFullScreen}

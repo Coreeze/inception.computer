@@ -2,6 +2,7 @@ import { Being } from "../../database/models/being";
 import { completeJSON } from "../ai/openrouter";
 import { IBeing } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
+import { generateBeingPortraitBackground } from "../ai/portraitGenerator";
 
 interface SpawnedNPC {
   first_name: string;
@@ -86,7 +87,11 @@ export async function spawnNPCs({
 
   if (docs.length === 0) return [];
 
-  return (await Being.insertMany(docs, { ordered: false })) as IBeing[];
+  const created = (await Being.insertMany(docs, { ordered: false })) as IBeing[];
+  for (const npc of created) {
+    generateBeingPortraitBackground(npc._id.toString());
+  }
+  return created;
 }
 
 function clamp(n: number | undefined, min: number, max: number): number | undefined {

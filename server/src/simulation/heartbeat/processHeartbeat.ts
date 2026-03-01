@@ -42,110 +42,123 @@ async function processBeingAction(
     }
   }
 
-  if (action.place && action.longitude != null && action.latitude != null) {
-    if (placeName) {
-      if (isMain) {
-        const existing = await Places.findOne({
-          main_character: character._id,
-          name: placeName,
-        });
-        if (!existing) {
-          const description = actionType === "discover_place" && action.discovery_place?.description ? action.discovery_place.description : undefined;
-          try {
-            await Places.create({
-              user: character.user,
-              sandbox: sandbox._id,
-              main_character: character._id,
-              name: placeName,
-              description,
-              latitude: action.latitude,
-              longitude: action.longitude,
-              city: action.city,
-              country: action.country,
-              introduced_via: actionType === "discover_place" ? "player_discover" : "exploration",
-              introduced_by: being._id,
-            });
-          } catch {}
-        }
-      } else {
-        const places = being.discovered_places || [];
-        const alreadyKnown = places.some((p) => p.name?.toLowerCase() === placeName.toLowerCase());
-        if (!alreadyKnown) {
-          places.push({
+  const actionPlaces = Array.isArray(action.places) ? action.places : [];
+  const actionPeople = Array.isArray(action.people) ? action.people : [];
+
+  if (action.place && action.longitude != null && action.latitude != null && placeName) {
+    if (isMain) {
+      const existing = await Places.findOne({ main_character: character._id, name: placeName });
+      if (!existing) {
+        try {
+          await Places.create({
+            user: character.user,
+            sandbox: sandbox._id,
+            main_character: character._id,
             name: placeName,
-            description: action.discovery_place?.description,
             latitude: action.latitude,
             longitude: action.longitude,
+            city: action.city,
+            country: action.country,
+            introduced_via: "exploration",
+            introduced_by: being._id,
           });
-          being.discovered_places = places;
-        }
+        } catch {}
+      }
+    } else {
+      const knownPlaces = being.discovered_places || [];
+      if (!knownPlaces.some((p) => p.name?.toLowerCase() === placeName.toLowerCase())) {
+        knownPlaces.push({ name: placeName, latitude: action.latitude, longitude: action.longitude });
+        being.discovered_places = knownPlaces;
       }
     }
   }
 
-  if (actionType === "discover_place" && action.discovery_place && isMain) {
-    const dp = action.discovery_place;
-    const dpName = (dp.name || action.place || "").trim();
-    if (dpName) {
-      const places = being.discovered_places || [];
-      const alreadyKnown = places.some((p) => p.name?.toLowerCase() === dpName.toLowerCase());
-      if (!alreadyKnown) {
-        places.push({
-          name: dpName,
-          description: dp.description,
-          latitude: dp.latitude ?? action.latitude,
-          longitude: dp.longitude ?? action.longitude,
+  for (const ap of actionPlaces) {
+    const apName = (ap.name || "").trim();
+    if (!apName) continue;
+
+    if (isMain) {
+      const existing = await Places.findOne({ main_character: character._id, name: apName });
+      if (!existing) {
+        try {
+          await Places.create({
+            user: character.user,
+            sandbox: sandbox._id,
+            main_character: character._id,
+            name: apName,
+            description: ap.description,
+            latitude: ap.latitude ?? action.latitude,
+            longitude: ap.longitude ?? action.longitude,
+            city: action.city,
+            country: action.country,
+            introduced_via: "exploration",
+            introduced_by: being._id,
+          });
+        } catch {}
+      }
+    } else {
+      const knownPlaces = being.discovered_places || [];
+      if (!knownPlaces.some((p) => p.name?.toLowerCase() === apName.toLowerCase())) {
+        knownPlaces.push({
+          name: apName,
+          description: ap.description,
+          latitude: ap.latitude ?? action.latitude,
+          longitude: ap.longitude ?? action.longitude,
         });
-        being.discovered_places = places;
+        being.discovered_places = knownPlaces;
       }
     }
   }
 
-  if (actionType === "discover_person" && action.discovery_person) {
-    const dperson = action.discovery_person;
-    const personFirstName = (dperson.first_name || "").trim();
-    if (personFirstName) {
-      const people = being.discovered_people || [];
-      people.push({
-        first_name: personFirstName,
-        last_name: dperson.last_name,
-        description: dperson.description,
-        occupation: dperson.occupation,
+  for (const person of actionPeople) {
+    const firstName = (person.first_name || "").trim();
+    if (!firstName) continue;
+
+    const knownPeople = being.discovered_people || [];
+    const alreadyKnown = knownPeople.some(
+      (p) => p.first_name?.toLowerCase() === firstName.toLowerCase() && (p.last_name || "").toLowerCase() === (person.last_name || "").toLowerCase()
+    );
+    if (!alreadyKnown) {
+      knownPeople.push({
+        first_name: firstName,
+        last_name: person.last_name,
+        description: person.description,
+        occupation: person.occupation,
       });
-      being.discovered_people = people;
+      being.discovered_people = knownPeople;
+    }
 
-      if (isMain) {
-        const existing = await Being.findOne({
-          sandbox: sandbox._id,
-          first_name: personFirstName,
-          last_name: dperson.last_name || undefined,
-          is_deleted: { $ne: true },
-        });
-        if (!existing) {
-          try {
-            await Being.create({
-              user: character.user,
-              sandbox: sandbox._id,
-              species: "human",
-              self_awareness: "aware",
-              is_main: false,
-              main_character: character._id,
-              first_name: personFirstName,
-              last_name: dperson.last_name,
-              occupation: dperson.occupation,
-              description: dperson.description,
-              home_longitude: action.longitude ?? character.current_longitude,
-              home_latitude: action.latitude ?? character.current_latitude,
-              home_city: action.city || character.current_city,
-              home_country: action.country || character.current_country,
-              current_longitude: action.longitude ?? character.current_longitude,
-              current_latitude: action.latitude ?? character.current_latitude,
-              current_city: action.city,
-              current_country: action.country,
-              relationship_to_main_character: "acquaintance",
-            });
-          } catch {}
-        }
+    if (isMain) {
+      const existing = await Being.findOne({
+        sandbox: sandbox._id,
+        first_name: firstName,
+        last_name: person.last_name || undefined,
+        is_deleted: { $ne: true },
+      });
+      if (!existing) {
+        try {
+          await Being.create({
+            user: character.user,
+            sandbox: sandbox._id,
+            species: "human",
+            self_awareness: "aware",
+            is_main: false,
+            main_character: character._id,
+            first_name: firstName,
+            last_name: person.last_name,
+            occupation: person.occupation,
+            description: person.description,
+            home_longitude: action.longitude ?? character.current_longitude,
+            home_latitude: action.latitude ?? character.current_latitude,
+            home_city: action.city || character.current_city,
+            home_country: action.country || character.current_country,
+            current_longitude: action.longitude ?? character.current_longitude,
+            current_latitude: action.latitude ?? character.current_latitude,
+            current_city: action.city,
+            current_country: action.country,
+            relationship_to_main_character: "acquaintance",
+          });
+        } catch {}
       }
     }
   }
@@ -308,6 +321,7 @@ export interface NPCUpdate {
   discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
   discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   wealth_index?: number;
+  image_url?: string;
 }
 
 export interface HeartbeatResult {
@@ -336,6 +350,7 @@ export interface HeartbeatResult {
     current_city: string | undefined;
     current_country: string | undefined;
     player_action_queue: any[];
+    image_url?: string;
   };
   npcUpdates: NPCUpdate[];
 }
@@ -384,6 +399,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
         current_city: character.current_city,
         current_country: character.current_country,
         player_action_queue: [],
+        image_url: character.image_url,
       },
       npcUpdates: [],
     };
@@ -486,6 +502,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
       discovered_places: npc.discovered_places,
       discovered_people: npc.discovered_people,
       wealth_index: npc.wealth_index,
+      image_url: npc.image_url,
     });
     await npc.save();
   }
@@ -525,6 +542,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
       current_city: character.current_city,
       current_country: character.current_country,
       player_action_queue: character.player_action_queue || [],
+      image_url: character.image_url,
     },
     npcUpdates,
   };

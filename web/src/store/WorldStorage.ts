@@ -73,6 +73,7 @@ interface WorldState {
       discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
       discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
       wealth_index?: number;
+      image_url?: string;
     }>
   ) => void;
   applyQueueUpdate: (playerQueue: IPlannedAction[]) => void;
@@ -184,6 +185,7 @@ const useWorldStorage = create<WorldState>()(
                   discovered_places: u.discovered_places ?? npc.discovered_places,
                   discovered_people: u.discovered_people ?? npc.discovered_people,
                   wealth_index: u.wealth_index ?? npc.wealth_index,
+                  image_url: u.image_url || npc.image_url,
                 }
               : npc;
           }),

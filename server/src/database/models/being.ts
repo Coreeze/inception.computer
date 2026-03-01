@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
+import { generateBeingPortraitBackground } from "../../services/ai/portraitGenerator";
 
 const beingsSchema = new mongoose.Schema(
   {
@@ -153,17 +154,27 @@ const beingsSchema = new mongoose.Schema(
           vibe_impact: { type: Number },
           wealth_impact: { type: Number },
           action_type: { type: String, enum: ["move", "discover_place", "discover_person", "buy", "event", "marry", "child_birth", "adopt_pet", "change_occupation"] },
-          discovery_place: {
-            name: { type: String },
-            description: { type: String },
-            latitude: { type: Number },
-            longitude: { type: Number },
+          places: {
+            type: [
+              {
+                name: { type: String },
+                description: { type: String },
+                latitude: { type: Number },
+                longitude: { type: Number },
+              },
+            ],
+            default: [],
           },
-          discovery_person: {
-            first_name: { type: String },
-            last_name: { type: String },
-            description: { type: String },
-            occupation: { type: String },
+          people: {
+            type: [
+              {
+                first_name: { type: String },
+                last_name: { type: String },
+                description: { type: String },
+                occupation: { type: String },
+              },
+            ],
+            default: [],
           },
           purchase: {
             object_type: { type: String },
@@ -260,6 +271,16 @@ const beingsSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+beingsSchema.pre("save", function () {
+  this.$locals.wasNew = this.isNew;
+});
+
+beingsSchema.post("save", function () {
+  if (this.$locals.wasNew && !this.image_url) {
+    generateBeingPortraitBackground(this._id.toString());
+  }
+});
+
 beingsSchema.index({ main_character: 1 });
 beingsSchema.index({ sandbox: 1 });
 beingsSchema.index({ user: 1 });
@@ -286,9 +307,9 @@ export interface IPlannedAction {
   health_impact?: number;
   vibe_impact?: number;
   wealth_impact?: number;
-  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
-  discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
-  discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
+  action_type?: "move" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
+  places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   purchase?: { object_type: string; name: string; price: number; description?: string };
   event_participants?: (mongoose.Types.ObjectId | string)[];
   name_change?: { last_name: string };

@@ -102,6 +102,7 @@ export default function WorldLayout({
                 current_city: ca.current_city,
                 current_country: ca.current_country,
                 player_action_queue: ca.player_action_queue,
+                image_url: ca.image_url || current.image_url,
               }
             : {}),
         });

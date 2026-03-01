@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { initializeSandbox } from "@/lib/api/simulation";
 import { setCharacterID } from "@/lib/api/index";
+import HolodeckBackground from "./HolodeckBackground";
 
 export default function CreateWorldPage() {
   const router = useRouter();
@@ -51,11 +52,12 @@ export default function CreateWorldPage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center font-[family-name:var(--font-mono)] px-6 py-12">
-      <h1 className="text-4xl font-serif tracking-tight mb-2">Create your world</h1>
-      <p className="text-[#7a756d] mb-8">Who do you want to be?</p>
+    <main className="relative min-h-screen flex flex-col items-center justify-center font-[family-name:var(--font-mono)] px-6 py-12">
+      <HolodeckBackground />
+      <h1 className="relative z-20 text-4xl font-serif tracking-tight mb-2">Create your world</h1>
+      <p className="relative z-20 text-[#7a756d] mb-8">Who do you want to be?</p>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
+      <form onSubmit={handleSubmit} className="relative z-20 w-full max-w-md space-y-4">
         <div className="flex gap-3">
           <input
             type="text"

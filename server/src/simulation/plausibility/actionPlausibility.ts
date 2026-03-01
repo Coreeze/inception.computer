@@ -49,30 +49,28 @@ export function evaluatePlannedAction(being: IBeing, action: IPlannedAction, san
     return { allow: false, reason: "unknown_action_type" };
   }
 
-  if (actionType === "discover_place") {
-    const placeName = (normalized.discovery_place?.name || normalized.place || "").trim();
-    if (!placeName) return { allow: false, reason: "discover_place_missing_name" };
-    normalized.discovery_place = {
-      ...(normalized.discovery_place || { name: placeName }),
-      name: placeName,
-      latitude: typeof normalized.discovery_place?.latitude === "number" ? clamp(normalized.discovery_place.latitude, -90, 90) : normalized.latitude,
-      longitude: typeof normalized.discovery_place?.longitude === "number" ? clamp(normalized.discovery_place.longitude, -180, 180) : normalized.longitude,
-    };
-    normalized.place = normalized.place || placeName;
-    return { allow: true, action: normalized, reason: "normalized" };
+  if (Array.isArray(normalized.places)) {
+    normalized.places = normalized.places
+      .map((p) => ({
+        ...p,
+        name: (p.name || "").trim(),
+        description: p.description?.trim() || undefined,
+        latitude: typeof p.latitude === "number" ? clamp(p.latitude, -90, 90) : normalized.latitude,
+        longitude: typeof p.longitude === "number" ? clamp(p.longitude, -180, 180) : normalized.longitude,
+      }))
+      .filter((p) => p.name);
   }
 
-  if (actionType === "discover_person") {
-    const firstName = (normalized.discovery_person?.first_name || "").trim();
-    if (!firstName) return { allow: false, reason: "discover_person_missing_first_name" };
-    normalized.discovery_person = {
-      ...normalized.discovery_person,
-      first_name: firstName,
-      last_name: normalized.discovery_person?.last_name?.trim() || undefined,
-      occupation: normalized.discovery_person?.occupation?.trim() || undefined,
-      description: normalized.discovery_person?.description?.trim() || undefined,
-    };
-    return { allow: true, action: normalized, reason: "normalized" };
+  if (Array.isArray(normalized.people)) {
+    normalized.people = normalized.people
+      .map((p) => ({
+        ...p,
+        first_name: (p.first_name || "").trim(),
+        last_name: p.last_name?.trim() || undefined,
+        occupation: p.occupation?.trim() || undefined,
+        description: p.description?.trim() || undefined,
+      }))
+      .filter((p) => p.first_name);
   }
 
   if (actionType === "buy") {

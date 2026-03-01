@@ -10,8 +10,8 @@ export async function getSandboxContext(sandboxID: string, mainCharacterID: stri
   }
 
   const [places, beings, events] = await Promise.all([
-    Places.findOne({ sandbox: sandboxID }).select("name type longitude latitude").lean(),
-    Being.find({ sandbox: sandboxID }).select("first_name last_name occupation").lean(),
+    Places.find({ sandbox: sandboxID }).select("name description longitude latitude").lean(),
+    Being.find({ sandbox: sandboxID }).select("first_name last_name occupation relationship_to_main_character current_longitude current_latitude").lean(),
     Event.find({ character: new ObjectId(mainCharacterID) })
       .select("title sim_year sim_month sim_day")
       .lean(),

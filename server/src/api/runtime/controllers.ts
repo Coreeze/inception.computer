@@ -11,6 +11,7 @@ import { applyMissionProgressChange } from "../../simulation/subscribers/beingDe
 import { MilestoneEvent } from "../../simulation/heartbeat/heartbeatSubscribers";
 import { completeJSON } from "../../services/ai/openrouter";
 import { generateFlux2FastImage } from "../../services/ai/fal";
+import { buildBeingImagePrompt } from "../../services/ai/portraitGenerator";
 import { stringifyCharacter, stringifyNPC } from "../../services/character/serialize";
 import { io, playerSocketMap } from "../../index";
 import { formatSimDate } from "../../utils/formatSimDate";
@@ -90,28 +91,6 @@ async function resolvePlayerAndCharacter(playerID: string, characterID: string) 
     throw new Error("Character does not belong to player");
   }
   return { user, character };
-}
-
-function buildBeingImagePrompt(being: any): string {
-  const details = [
-    `${(being.first_name || "").trim()} ${(being.last_name || "").trim()}`.trim(),
-    being.gender || "",
-    being.occupation || "",
-    being.description || "",
-    being.body_type || "",
-    being.skin_tone || "",
-    being.hair_color || "",
-    being.hair_type || "",
-    being.eye_color || "",
-    being.eye_emotions || "",
-    typeof being.glasses === "boolean" ? (being.glasses ? "wearing glasses" : "no glasses") : "",
-    being.current_city && being.current_country ? `living in ${being.current_city}, ${being.current_country}` : "",
-  ]
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean);
-
-  const fallback = "a human character portrait with visible full body and grounded everyday outfit";
-  return details.length > 0 ? details.join(", ") : fallback;
 }
 
 function buildPlaceImagePrompt(place: any): string {
@@ -749,8 +728,8 @@ export const doStuffSuggestEndpoint = async (req: Request, res: Response) => {
         longitude: number;
         latitude: number;
         action_type?: string;
-        discovery_person?: any;
-        discovery_place?: any;
+        places?: any[];
+        people?: any[];
         purchase?: any;
         pet?: any;
       };
@@ -763,8 +742,8 @@ export const doStuffSuggestEndpoint = async (req: Request, res: Response) => {
         longitude: number;
         latitude: number;
         action_type?: string;
-        discovery_person?: any;
-        discovery_place?: any;
+        places?: any[];
+        people?: any[];
         purchase?: any;
         pet?: any;
       };
@@ -787,10 +766,9 @@ Known people: ${npcContext || "none"}
 DATE: ${dateStr}
 
 Suggest exactly 2 actions. One should be low-friction (near current location), the other more ambitious.
-Most actions in real life involve discovering new places or meeting new people — prefer discover_place and discover_person over plain "move".
-Only use "move" if revisiting a known location with no new interaction.
-If discover_person, include discovery_person: {first_name, last_name, description, occupation}. Make them a unique, plausible individual.
-If discover_place, include discovery_place: {name, description, latitude, longitude}. Use a real, specific place with real coordinates.
+Every action must include "places" (array of places visited) and "people" (array of people encountered). Like real life — you're always somewhere and usually around someone.
+places: [{name, description, latitude, longitude}]. Use real, specific places with real coordinates.
+people: [{first_name, last_name, description, occupation}]. Make them unique, plausible individuals.
 If adopt_pet, include pet: {species, name, acquisition_mode: "meet"|"buy"|"adopt"}.
 If buy, include purchase: {object_type, name, price, description}.
 
@@ -836,8 +814,8 @@ export const doStuffSelectEndpoint = async (req: Request, res: Response) => {
       longitude: selectedAction.longitude,
       latitude: selectedAction.latitude,
       action_type: selectedAction.action_type,
-      discovery_place: selectedAction.discovery_place,
-      discovery_person: selectedAction.discovery_person,
+      places: selectedAction.places,
+      people: selectedAction.people,
       purchase: selectedAction.purchase,
       pet: selectedAction.pet,
     };

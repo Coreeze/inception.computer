@@ -40,13 +40,11 @@ interface WeeklyPlanAction {
   place: string;
   longitude: number;
   latitude: number;
-  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
-  discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
-  discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
+  action_type?: "move" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
+  places?: { name: string; description?: string; latitude?: number; longitude?: number }[];
+  people?: { first_name: string; last_name?: string; description?: string; occupation?: string }[];
   purchase?: { object_type: string; name: string; price: number; description?: string };
   event_participants?: string[];
-  discovered_places?: { name: string; description?: string; latitude?: number; longitude?: number };
-  discovered_people?: { first_name: string; last_name?: string; description?: string; occupation?: string };
   purchased_objects?: { object_type: string; name: string; price: number; description?: string };
   attended_events?: string[];
   name_change?: { last_name: string };
@@ -62,44 +60,48 @@ interface BatchPlanEntry {
 }
 
 const COMPRESSED_PLANNER_CONSTITUTION = `
-- Simulate persistent real life: world state accumulates; no disposable entities.
-- If an action references a non-existing person/place/entity/business/relationship, create it (after dedupe).
-- Dedupe by normalized identity + geo proximity + recent-time window + relationship context.
-- Main-character interactions: create first-class records immediately.
-- NPC interactions: persist metadata at minimum; materialize full records when simulation requires.
-- Behavior must follow human drives: belonging, safety, status, purpose, resources.
-- Use neuroscience balance: attachment, reward prediction, stress regulation, habit loops, social homeostasis.
-- Discoveries are natural and uncapped when context supports them; avoid artificial numeric limits.
-- Use action_type "move" only when revisiting a known location with no new interactions.
-- Each discovered person must be a unique, plausible individual with a real name and occupation.
-- Each discovered place must be a specific real-world place with plausible nearby coordinates.
-- Relationships evolve gradually; include social network effects (introductions, trust, reputation, conflict, repair).
-- Marriage and parenting are plausible only when relationship context supports them.
-- Family duties (visits, weddings, caregiving) can motivate local or international travel.
-- Last-name changes are optional and only occur in marriage context.
-- Economic life must be plausible: earn/spend/save/borrow/invest/build/close businesses under constraints.
-- Purchases should occur when context supports them (groceries, equipment, gifts, etc.).
-- Occupation changes are allowed only when career continuity is plausible.
-- Major transitions require plausibility checks: temporal, geographic, social-psychological, economic, life-stage.
-- Prefer plausible adaptation over invalid jumps; if implausible, pivot to nearest valid action.
-- Maintain continuity and inertia; no abrupt identity/personality oscillations without triggers.
-- Failures should produce adaptive follow-up (retry/pivot/defer/help), not repetitive loops.
-- Log major transitions deterministically with provenance (who/what/where/why/when/source).
-- Output strict schema-valid JSON only; never emit malformed required fields.
+CORE PRINCIPLE: Every action MUST involve at least one entity — a person, place, object, or business. Pure movement without entity interaction is invalid.
+
+EVERY ACTION HAS PLACES AND PEOPLE:
+- Every action MUST include a "places" array (where it happens) and a "people" array (who is involved or encountered).
+- If a person or place doesn't already exist, CREATE them inline. The simulation will persist them.
+- Dedupe against "Already discovered" lists; only create genuinely new entities.
+- Each person: unique real first_name + last_name, occupation, description.
+- Each place: specific real-world venue with name, description, plausible nearby coordinates.
+
+ACTION TYPES:
+1. buy — acquire an object (food, tools, clothes, gifts, household items, supplies)
+2. event — social gathering with known people (use event_participants with npc_ids)
+3. marry / child_birth / adopt_pet / change_occupation — life milestones when context supports them
+4. move — ONLY for routine returns (going home, commuting); use sparingly (max 1-2 per week); still requires places array
+
+BEHAVIORAL REALISM:
+- Follow human drives: belonging, safety, status, purpose, resources.
+- Relationships evolve gradually; introductions, trust, reputation, conflict, repair.
+- Economic life: earn/spend/save; purchases when context supports them.
+- Marriage/parenting only when relationship context supports them.
+- Occupation changes only when career continuity is plausible.
+- Maintain continuity; no abrupt identity shifts without triggers.
+- Major transitions require plausibility: temporal, geographic, social, economic, life-stage.
+
+OUTPUT:
+- Strict schema-valid JSON only; no markdown/comments/trailing commas.
 `.trim();
 
 const PLANNER_SYSTEM_PROMPT = "You generate realistic weekly plans for beings in a life simulation. Return strict schema-valid JSON only.";
 
 const ACTION_RULES_BLOCK = `Rules for each action:
-1. Be realistic for personality, occupation, and life stage
-2. Include a specific destination with real coordinates
-3. Reflect real daily life; most days involve going somewhere new or meeting someone
-4. Use action_type precisely: discover_place (new place), discover_person (new person), buy (purchase), event (social gathering)
-5. If action_type is "buy", purchase.price must be a JSON number only
-6. If action_type is "marry", include family_membership.spouse_name and relationship_event:"marriage"
-7. If action_type is "child_birth", include family_membership.child_name and relationship_event:"child_birth"
-8. If action_type is "adopt_pet", include pet:{species,name,acquisition_mode}
-9. If action_type is "change_occupation", include occupation_change:{occupation}`;
+1. EVERY action MUST include "places" (array of places visited/interacted with) and "people" (array of people encountered/interacted with).
+2. "places" must have at least 1 entry per action. Each entry: {name, description, latitude, longitude}.
+3. "people" should have at least 1 entry on most actions. Each entry: {first_name, last_name, description, occupation}. Only omit if the action is truly solitary.
+4. Include purchase when action_type is "buy" (object_type, name, price as JSON number, description).
+5. Include event_participants (array of npc_ids) when action_type is "event".
+6. If action_type is "marry", include family_membership.spouse_name and relationship_event:"marriage".
+7. If action_type is "child_birth", include family_membership.child_name and relationship_event:"child_birth".
+8. If action_type is "adopt_pet", include pet:{species,name,acquisition_mode}.
+9. If action_type is "change_occupation", include occupation_change:{occupation}.
+10. action_type "move" is only for routine transit (commute home, return to base). Max 2 per week. Still requires places.
+11. Each action needs a specific destination with real coordinates.`;
 
 const ACTION_SCHEMA_BLOCK = `Action shape:
 {
@@ -110,9 +112,9 @@ const ACTION_SCHEMA_BLOCK = `Action shape:
   "place": "...",
   "longitude": N,
   "latitude": N,
-  "action_type"?: "move"|"discover_place"|"discover_person"|"buy"|"event"|"marry"|"child_birth"|"adopt_pet"|"change_occupation",
-  "discovery_place"?: { "name", "description", "latitude", "longitude" },
-  "discovery_person"?: { "first_name", "last_name", "description", "occupation" },
+  "action_type"?: "move"|"buy"|"event"|"marry"|"child_birth"|"adopt_pet"|"change_occupation",
+  "places": [{ "name", "description", "latitude", "longitude" }],
+  "people": [{ "first_name", "last_name", "description", "occupation" }],
   "purchase"?: { "object_type": "property"|"car"|"object", "name", "price", "description" },
   "event_participants"?: ["npc_id"],
   "name_change"?: { "last_name" },
@@ -128,17 +130,7 @@ const OUTPUT_FORMAT_BLOCK = `Output formatting:
 - Return strict JSON only (no markdown/comments/trailing commas/single quotes/undefined)
 - Return minified JSON (single line)`;
 
-const KNOWN_ACTION_TYPES = new Set([
-  "move",
-  "discover_place",
-  "discover_person",
-  "buy",
-  "event",
-  "marry",
-  "child_birth",
-  "adopt_pet",
-  "change_occupation",
-]);
+const KNOWN_ACTION_TYPES = new Set(["move", "buy", "event", "marry", "child_birth", "adopt_pet", "change_occupation"]);
 
 function parseNumeric(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -183,27 +175,33 @@ function sanitizeWeeklyAction(action: WeeklyPlanAction): WeeklyPlanAction | null
     action_type: actionType,
   };
 
-  if (actionType === "discover_place") {
-    const discoveryPlaceName = sanitizeText(action.discovery_place?.name) || place;
-    if (!discoveryPlaceName) return null;
-    normalized.discovery_place = {
-      name: discoveryPlaceName,
-      description: sanitizeText(action.discovery_place?.description),
-      latitude: clampNumber(action.discovery_place?.latitude, -90, 90) ?? normalized.latitude,
-      longitude: clampNumber(action.discovery_place?.longitude, -180, 180) ?? normalized.longitude,
-    };
-  }
+  const rawPlaces = Array.isArray(action.places) ? action.places : [];
+  normalized.places = rawPlaces
+    .map((p) => {
+      const name = sanitizeText(p.name);
+      if (!name) return null;
+      return {
+        name,
+        description: sanitizeText(p.description),
+        latitude: clampNumber(p.latitude, -90, 90) ?? normalized.latitude,
+        longitude: clampNumber(p.longitude, -180, 180) ?? normalized.longitude,
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
-  if (actionType === "discover_person") {
-    const firstName = sanitizeText(action.discovery_person?.first_name);
-    if (!firstName) return null;
-    normalized.discovery_person = {
-      first_name: firstName,
-      last_name: sanitizeText(action.discovery_person?.last_name),
-      description: sanitizeText(action.discovery_person?.description),
-      occupation: sanitizeText(action.discovery_person?.occupation),
-    };
-  }
+  const rawPeople = Array.isArray(action.people) ? action.people : [];
+  normalized.people = rawPeople
+    .map((p) => {
+      const firstName = sanitizeText(p.first_name);
+      if (!firstName) return null;
+      return {
+        first_name: firstName,
+        last_name: sanitizeText(p.last_name),
+        description: sanitizeText(p.description),
+        occupation: sanitizeText(p.occupation),
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
   if (actionType === "adopt_pet" && action.pet) {
     const species = sanitizeText(action.pet.species);
@@ -243,20 +241,32 @@ function sanitizeWeeklyActions(actions: WeeklyPlanAction[] | undefined): WeeklyP
 }
 
 function compactSandboxContext(sandboxContext: any): any {
-  const places = Array.isArray(sandboxContext?.places) ? sandboxContext.places.slice(0, 10) : sandboxContext?.places ? [sandboxContext.places] : [];
-  const beings = Array.isArray(sandboxContext?.beings) ? sandboxContext.beings.slice(0, 20) : [];
-  const events = Array.isArray(sandboxContext?.events) ? sandboxContext.events.slice(0, 12) : [];
+  const rawPlaces = Array.isArray(sandboxContext?.places) ? sandboxContext.places : sandboxContext?.places ? [sandboxContext.places] : [];
+  const places = rawPlaces.slice(0, 10).map((p: any) => ({
+    name: p.name,
+    desc: p.description,
+    lat: p.latitude,
+    lon: p.longitude,
+  }));
+
+  const rawBeings = Array.isArray(sandboxContext?.beings) ? sandboxContext.beings : [];
+  const beings = rawBeings.slice(0, 20).map((b: any) => ({
+    fn: b.first_name,
+    ln: b.last_name,
+    occ: b.occupation,
+    rel: b.relationship_to_main_character,
+    lat: b.current_latitude,
+    lon: b.current_longitude,
+  }));
+
+  const events = Array.isArray(sandboxContext?.events) ? sandboxContext.events.slice(0, 12).map((e: any) => e.title) : [];
 
   return {
-    sandbox: {
-      current_year: sandboxContext?.sandbox?.current_year,
-      current_month: sandboxContext?.sandbox?.current_month,
-      current_day: sandboxContext?.sandbox?.current_day,
-      currency: sandboxContext?.sandbox?.currency,
-    },
+    date: `${sandboxContext?.sandbox?.current_month}/${sandboxContext?.sandbox?.current_day}/${sandboxContext?.sandbox?.current_year}`,
+    currency: sandboxContext?.sandbox?.currency,
     places,
     beings,
-    recent_events: events,
+    events,
   };
 }
 
@@ -297,8 +307,8 @@ function toPlannedAction(action: WeeklyPlanAction, sandbox: ISandboxDocument, ot
     longitude: clampNumber(action.longitude, -180, 180),
     latitude: clampNumber(action.latitude, -90, 90),
     action_type: action.action_type || "move",
-    discovery_place: action.discovery_place || action.discovered_places,
-    discovery_person: action.discovery_person || action.discovered_people,
+    places: action.places || [],
+    people: action.people || [],
     purchase: safePurchase,
     event_participants: eventParticipants,
     name_change: action.name_change,
@@ -320,19 +330,15 @@ async function generateWeeklyPlansBatch({
 }): Promise<Map<string, IPlannedAction[]>> {
   const compactContext = compactSandboxContext(sandboxContext);
   const npcDetails = npcs.map((npc) => ({
-    npc_id: npc._id.toString(),
-    first_name: npc.first_name || "",
-    last_name: npc.last_name || "",
-    occupation: npc.occupation || "Unknown",
-    soul_md: (npc.soul_md || "Unknown").slice(0, 120),
-    life_md: (npc.life_md || "").slice(-140),
-    relationship_to_player: npc.relationship_to_main_character || "Unknown",
-    home_city: npc.home_city,
-    home_country: npc.home_country,
-    home_longitude: npc.home_longitude,
-    home_latitude: npc.home_latitude,
-    current_location: npc.current_place || npc.current_city || "Unknown",
-    current_feeling: npc.current_feeling || "Unknown",
+    id: npc._id.toString(),
+    name: `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
+    occ: npc.occupation || "Unknown",
+    rel: npc.relationship_to_main_character || "Unknown",
+    home: `${npc.home_city},${npc.home_country}`,
+    lat: npc.home_latitude,
+    lon: npc.home_longitude,
+    loc: npc.current_place || npc.current_city || "Unknown",
+    feel: npc.current_feeling || "Unknown",
   }));
 
   const npcRoster = npcs.map((n) => ({
@@ -340,21 +346,22 @@ async function generateWeeklyPlansBatch({
     name: `${n.first_name || ""} ${n.last_name || ""}`.trim(),
   }));
 
-  const prompt = `You are planning a week for multiple NPCs in a life simulation.
-
-Simulation context:
-${JSON.stringify(compactContext)}
+  const prompt = `Plan a week for multiple NPCs. Every action must involve interacting with a PERSON, PLACE, or OBJECT. If one doesn't exist yet, create it.
 
 DATE: ${sandbox.current_month}/${sandbox.current_day}/${sandbox.current_year}
 
 NPC roster (use npc_id values for event_participants):
 ${JSON.stringify(npcRoster)}
 
-Generate exactly 7 daily actions for each NPC below:
+NPCs to plan for:
 ${JSON.stringify(npcDetails)}
 
-PLANNER CONSTITUTION:
+Simulation context:
+${JSON.stringify(compactContext)}
+
 ${COMPRESSED_PLANNER_CONSTITUTION}
+
+Generate exactly 7 daily actions per NPC. Each action must create or interact with at least one entity (person, place, or object). Avoid bare "move" actions — if they travel somewhere, they must discover a place, meet someone, or acquire something there.
 
 ${ACTION_RULES_BLOCK}
 
@@ -407,21 +414,28 @@ async function generateBeingWeeklyPlan({
   const isMainCharacter = !!npc.is_main;
   const npcList =
     otherNpcs.length > 0
-      ? `\nKnown people (use _id for event_participants): ${otherNpcs.map((n) => `${n._id}: ${n.first_name} ${n.last_name}`).join(", ")}`
+      ? `\nKnown people (use _id for event_participants): ${otherNpcs.map((n) => `${n._id}:${n.first_name} ${n.last_name}[${n.occupation || "?"}]`).join(", ")}`
       : "";
 
-  const existingPlaces = (npc.discovered_places || []).map((p) => p.name).join(", ");
-  const existingPeople = (npc.discovered_people || []).map((p) => `${p.first_name} ${p.last_name || ""}`).join(", ");
+  const existingPlaces = (npc.discovered_places || [])
+    .map((p) => `${p.name}(${p.latitude?.toFixed(2)},${p.longitude?.toFixed(2)})`)
+    .join(", ");
+  const existingPeople = (npc.discovered_people || [])
+    .map((p) => `${p.first_name} ${p.last_name || ""}${p.occupation ? ` [${p.occupation}]` : ""}`)
+    .join(", ");
 
   const resolvedSandboxContext = sandboxContext || (await getSandboxContext(sandbox._id.toString(), npc._id.toString()));
   const compactContext = compactSandboxContext(resolvedSandboxContext);
 
   const roleLabel = isMainCharacter ? "MAIN CHARACTER (free will active)" : "NPC";
 
-  const prompt = `You are planning a week for a ${roleLabel} in a life simulation that emulates real life.
+  const prompt = `Plan a week for a ${roleLabel}. Every action must be aligned with the life mission and involve interacting with a PERSON, PLACE, or OBJECT. If one doesn't exist yet, create it.
 
-Simulation context:
-${JSON.stringify(compactContext)}
+  ${
+    isMainCharacter
+      ? `Life mission: ${npc.life_mission?.name || "None"} (progress: ${npc.life_mission?.progress ?? 0})`
+      : `Relationship to player: ${npc.relationship_to_main_character || "Unknown"}`
+  }
 
 ${roleLabel}:
 Name: ${npc.first_name} ${npc.last_name}
@@ -429,11 +443,7 @@ Occupation: ${npc.occupation || "Unknown"}
 Relationship status: ${npc.relationship_status || "Unknown"}
 Soul: ${npc.soul_md || "Unknown"}
 Life: ${(npc.life_md || "").slice(-300)}
-${
-  isMainCharacter
-    ? `Life mission: ${npc.life_mission?.name || "None"} (progress: ${npc.life_mission?.progress ?? 0})`
-    : `Relationship to player: ${npc.relationship_to_main_character || "Unknown"}`
-}
+
 Home: ${npc.home_city}, ${npc.home_country} (${npc.home_longitude}, ${npc.home_latitude})
 Current location: ${npc.current_place || npc.current_city || "Unknown"}
 Current feeling: ${npc.current_feeling || "Unknown"}
@@ -443,10 +453,12 @@ ${npcList}
 
 DATE: ${sandbox.current_month}/${sandbox.current_day}/${sandbox.current_year}
 
-PLANNER CONSTITUTION:
+Simulation context:
+${JSON.stringify(compactContext)}
+
 ${COMPRESSED_PLANNER_CONSTITUTION}
 
-Generate exactly 7 daily actions for this being.
+Generate exactly 7 daily actions. Each action must create or interact with at least one entity (person, place, or object). Avoid bare "move" actions — if they travel somewhere, they must discover a place, meet someone, or acquire something there.
 
 ${ACTION_RULES_BLOCK}
 
