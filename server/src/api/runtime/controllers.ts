@@ -5,13 +5,8 @@ import { User } from "../../database/models/user";
 import { Chat } from "../../database/models/chat";
 import { Places } from "../../database/models/places";
 import { getChoice, deleteChoice } from "../../simulation/heartbeat/choiceStore";
-import {
-  applyRuntimeAction,
-} from "../../socket/sessionManager";
-import {
-  startHeartbeatScheduler,
-  stopHeartbeatScheduler,
-} from "../../simulation/heartbeat/heartbeatScheduler";
+import { applyRuntimeAction } from "../../socket/sessionManager";
+import { startHeartbeatScheduler, stopHeartbeatScheduler } from "../../simulation/heartbeat/heartbeatScheduler";
 import { applyMissionProgressChange } from "../../simulation/subscribers/beingDecay";
 import { MilestoneEvent } from "../../simulation/heartbeat/heartbeatSubscribers";
 import { completeJSON } from "../../services/ai/openrouter";
@@ -20,11 +15,7 @@ import { stringifyCharacter, stringifyNPC } from "../../services/character/seria
 import { io, playerSocketMap } from "../../index";
 import { formatSimDate } from "../../utils/formatSimDate";
 
-async function resolveChatParticipants(
-  playerID: string,
-  characterID: string,
-  npcID: string
-) {
+async function resolveChatParticipants(playerID: string, characterID: string, npcID: string) {
   const user = await User.findOne({ player_id: playerID });
   if (!user) {
     throw new Error("Player not found");
@@ -51,11 +42,7 @@ async function resolveChatParticipants(
 export const heartbeatEndpoint = async (req: Request, res: Response) => {
   try {
     const { playerID, characterID, action } = req.body;
-    if (
-      !playerID ||
-      !characterID ||
-      (action !== "play" && action !== "pause")
-    ) {
+    if (!playerID || !characterID || (action !== "play" && action !== "pause")) {
       return res.status(400).json({ error: "Missing or invalid fields." });
     }
 
@@ -66,11 +53,7 @@ export const heartbeatEndpoint = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Character is dead." });
     }
 
-    const runtimeUpdate = applyRuntimeAction(
-      playerID,
-      character._id.toString(),
-      action
-    );
+    const runtimeUpdate = applyRuntimeAction(playerID, character._id.toString(), action);
     if (!runtimeUpdate.ok) {
       return res.status(409).json({ error: (runtimeUpdate as any).error });
     }
@@ -146,19 +129,13 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
     }
 
     if (choiceData.health_impact) {
-      character.health_index = Math.round(
-        Math.max(0, Math.min(100, (character.health_index || 0) + choiceData.health_impact)) * 10
-      ) / 10;
+      character.health_index = Math.round(Math.max(0, Math.min(100, (character.health_index || 0) + choiceData.health_impact)) * 10) / 10;
     }
     if (choiceData.vibe_impact) {
-      character.vibe_index = Math.round(
-        Math.max(0, Math.min(100, (character.vibe_index || 0) + choiceData.vibe_impact)) * 10
-      ) / 10;
+      character.vibe_index = Math.round(Math.max(0, Math.min(100, (character.vibe_index || 0) + choiceData.vibe_impact)) * 10) / 10;
     }
     if (choiceData.wealth_impact) {
-      character.wealth_index = Math.round(
-        (character.wealth_index || 0) + choiceData.wealth_impact
-      );
+      character.wealth_index = Math.round((character.wealth_index || 0) + choiceData.wealth_impact);
     }
     if (choiceData.life_mission_impact) {
       const m = applyMissionProgressChange(character, choiceData.life_mission_impact);
@@ -166,9 +143,7 @@ export const resolveChoiceEndpoint = async (req: Request, res: Response) => {
     }
 
     const place = choiceData.place ? ` at ${choiceData.place}` : "";
-    character.life_md =
-      (character.life_md || "") +
-      `\n- **${dateStr}** — *${choiceData.action}${place}.*`;
+    character.life_md = (character.life_md || "") + `\n- **${dateStr}** — *${choiceData.action}${place}.*`;
 
     character.active_heartbeat_id = undefined;
     await character.save();
@@ -197,8 +172,7 @@ export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
     const { playerID, characterID, npcID, content, kind, imagePrompt, imageURL } = req.body;
     const messageKind = kind === "image" ? "image" : "text";
     const textMessage = typeof content === "string" ? content.trim() : "";
-    const imagePromptMessage =
-      typeof imagePrompt === "string" ? imagePrompt.trim() : "";
+    const imagePromptMessage = typeof imagePrompt === "string" ? imagePrompt.trim() : "";
     const selectedImageURL = typeof imageURL === "string" ? imageURL.trim() : "";
     if (!playerID || !characterID || !npcID) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -219,11 +193,7 @@ export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Image prompt too long (max 400 chars)" });
     }
 
-    const { user, character, npc } = await resolveChatParticipants(
-      playerID,
-      characterID,
-      npcID
-    );
+    const { user, character, npc } = await resolveChatParticipants(playerID, characterID, npcID);
 
     const userMessageData: Record<string, unknown> = {
       user: user._id,
@@ -260,15 +230,14 @@ export const sendChatMessageEndpoint = async (req: Request, res: Response) => {
       })
       .join("\n");
 
-    const latestUserMessageContext =
-      messageKind === "image"
-        ? `[Image sent] Prompt: ${imagePromptMessage}`
-        : textMessage;
+    const latestUserMessageContext = messageKind === "image" ? `[Image sent] Prompt: ${imagePromptMessage}` : textMessage;
 
     const npcReplyJSON = await completeJSON<{ reply: string }>({
       model: "fast",
       systemPrompt: "You write short in-character NPC text replies for a life simulation.",
-      userPrompt: `You are replying as this NPC:\n${stringifyNPC(npc)}\n\nMain character context:\n${stringifyCharacter(character)}\n\nConversation so far:\n${transcript}\n\nLatest user message:\n${latestUserMessageContext}\n\nReturn JSON only: {"reply":"..."}.\nRules: 1-3 short sentences. Stay in-character. No markdown. No emojis.`,
+      userPrompt: `You are replying as this NPC:\n${stringifyNPC(npc)}\n\nMain character context:\n${stringifyCharacter(
+        character
+      )}\n\nConversation so far:\n${transcript}\n\nLatest user message:\n${latestUserMessageContext}\n\nReturn JSON only: {"reply":"..."}.\nRules: 1-3 short sentences. Stay in-character. No markdown. No emojis.`,
       maxTokens: 300,
     });
 
@@ -386,7 +355,7 @@ export const travelCharacterEndpoint = async (req: Request, res: Response) => {
 
 export const whatsHereEndpoint = async (req: Request, res: Response) => {
   try {
-    const { playerID, characterID, longitude, latitude, quickSummary } = req.body;
+    const { playerID, characterID, longitude, latitude, quickSummary, mapboxSummary } = req.body;
 
     if (!playerID || !characterID || typeof longitude !== "number" || typeof latitude !== "number") {
       return res.status(400).json({ error: "Missing required fields" });
@@ -439,11 +408,11 @@ export const whatsHereEndpoint = async (req: Request, res: Response) => {
 
     const generated = await completeJSON<{ description: string }>({
       model: "fast",
-      systemPrompt:
-        "You write short location flavor text for a life simulation map. Return strict JSON with key 'description'.",
+      systemPrompt: "You write short location flavor text for a life simulation map. Return strict JSON with key 'description'.",
       userPrompt: [
         `Coordinates: latitude ${latitude.toFixed(6)}, longitude ${longitude.toFixed(6)}.`,
         `Quick summary from UI: ${typeof quickSummary === "string" ? quickSummary : "none"}`,
+        `Mapbox metadata summary: ${typeof mapboxSummary === "string" ? mapboxSummary : "none"}`,
         `Known places context: ${placeContext || "none"}`,
         `Known NPC context: ${npcContext || "none"}`,
         "Write 1-2 short sentences. Keep it grounded and concrete. No markdown. No emojis.",

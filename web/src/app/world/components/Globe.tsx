@@ -29,6 +29,8 @@ export default function Globe() {
   const [locationInfoLLM, setLocationInfoLLM] = useState<string | null>(null);
   const [isTraveling, setIsTraveling] = useState(false);
   const [isGeneratingWhatsHere, setIsGeneratingWhatsHere] = useState(false);
+  const [lastMapboxSummary, setLastMapboxSummary] = useState<string | null>(null);
+  const [autoGenerateWhatsHere, setAutoGenerateWhatsHere] = useState(false);
 
   const character = useWorldStorage((s) => s.character);
   const triggerFocusCoordinates = useWorldStorage((s) => s.triggerFocusCoordinates);
@@ -74,26 +76,43 @@ export default function Globe() {
     });
     map.current = mapInstance;
 
+    const toMeaningfulText = (value: unknown): string | null => {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
+    const extractMapboxSummary = (features: mapboxgl.MapboxGeoJSONFeature[]): string | null => {
+      for (const feature of features) {
+        const props = (feature.properties || {}) as Record<string, unknown>;
+        const name =
+          toMeaningfulText(props.name_en) ||
+          toMeaningfulText(props.name) ||
+          toMeaningfulText(props["name:en"]) ||
+          toMeaningfulText(props.place_name) ||
+          toMeaningfulText(props.text);
+        if (!name) continue;
+        const category =
+          toMeaningfulText(props.class) ||
+          toMeaningfulText(props.type) ||
+          toMeaningfulText(props.maki) ||
+          toMeaningfulText(props.category);
+        return category ? `${name} (${category})` : name;
+      }
+      return null;
+    };
+
     const onMapClick = (e: mapboxgl.MapMouseEvent) => {
-      const panelWidth = 320;
-      const panelHeight = 140;
-      const margin = 12;
-      const viewportWidth = mapContainer.current?.clientWidth ?? window.innerWidth;
-      const viewportHeight = mapContainer.current?.clientHeight ?? window.innerHeight;
-      const x = Math.min(
-        Math.max(e.point.x, margin),
-        Math.max(margin, viewportWidth - panelWidth - margin)
-      );
-      const y = Math.min(
-        Math.max(e.point.y, margin),
-        Math.max(margin, viewportHeight - panelHeight - margin)
-      );
+      const renderedFeatures = map.current?.queryRenderedFeatures(e.point) || [];
+      const mapboxSummary = extractMapboxSummary(renderedFeatures);
       whatsHereRequestId.current += 1;
       setClickedLocation({ longitude: e.lngLat.lng, latitude: e.lngLat.lat });
-      setClickedPoint({ x, y });
+      updatePopupPointFromCoordinates(e.lngLat.lng, e.lngLat.lat);
       setLocationInfo(null);
       setLocationInfoLLM(null);
       setIsGeneratingWhatsHere(false);
+      setLastMapboxSummary(mapboxSummary);
+      setAutoGenerateWhatsHere(!!mapboxSummary);
 
       if (map.current) {
         if (!clickedLocationMarker.current) {
@@ -118,13 +137,17 @@ export default function Globe() {
           el.appendChild(centerDot);
           clickedLocationMarker.current = new mapboxgl.Marker({ element: el });
         }
-        clickedLocationMarker.current
-          .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .addTo(map.current);
+        clickedLocationMarker.current.setLngLat([e.lngLat.lng, e.lngLat.lat]).addTo(map.current);
       }
     };
 
+    const onMapMove = (e: mapboxgl.MapMouseEvent) => {
+      const renderedFeatures = map.current?.queryRenderedFeatures(e.point) || [];
+      mapInstance.getCanvas().style.cursor = extractMapboxSummary(renderedFeatures) ? "crosshair" : "";
+    };
+
     mapInstance.on("click", onMapClick);
+    mapInstance.on("mousemove", onMapMove);
     mapInstance.on("load", () => {
       setMapLoaded(true);
     });
@@ -133,6 +156,8 @@ export default function Globe() {
       clickedLocationMarker.current?.remove();
       clickedLocationMarker.current = null;
       mapInstance.off("click", onMapClick);
+      mapInstance.off("mousemove", onMapMove);
+      mapInstance.getCanvas().style.cursor = "";
       mapInstance.remove();
       map.current = null;
     };
@@ -382,9 +407,7 @@ export default function Globe() {
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
@@ -395,8 +418,31 @@ export default function Globe() {
     setLocationInfo(null);
     setLocationInfoLLM(null);
     setIsGeneratingWhatsHere(false);
+    setLastMapboxSummary(null);
+    setAutoGenerateWhatsHere(false);
     clickedLocationMarker.current?.remove();
     clickedLocationMarker.current = null;
+  };
+
+  const updatePopupPointFromCoordinates = (longitude: number, latitude: number) => {
+    if (!map.current || !mapContainer.current) return;
+    const projected = map.current.project([longitude, latitude]);
+    const panelWidth = 340;
+    const panelHeight = 250;
+    const margin = 12;
+    const offsetX = 14;
+    const offsetY = -26;
+    const viewportWidth = mapContainer.current.clientWidth;
+    const viewportHeight = mapContainer.current.clientHeight;
+    const x = Math.min(
+      Math.max(projected.x + offsetX, margin),
+      Math.max(margin, viewportWidth - panelWidth - margin)
+    );
+    const y = Math.min(
+      Math.max(projected.y + offsetY, margin),
+      Math.max(margin, viewportHeight - panelHeight - margin)
+    );
+    setClickedPoint({ x, y });
   };
 
   const showWhatsHere = () => {
@@ -404,12 +450,7 @@ export default function Globe() {
 
     const nearbyNpcs = npcs.filter((npc) => {
       if (npc.current_longitude == null || npc.current_latitude == null) return false;
-      return distanceKm(
-        clickedLocation.latitude,
-        clickedLocation.longitude,
-        npc.current_latitude,
-        npc.current_longitude
-      ) <= 2;
+      return distanceKm(clickedLocation.latitude, clickedLocation.longitude, npc.current_latitude, npc.current_longitude) <= 2;
     }).length;
 
     let nearestPlace: { name: string; distance: number } | null = null;
@@ -425,7 +466,8 @@ export default function Globe() {
         ? `Nearest known place: ${nearestPlace.name} (${nearestPlace.distance.toFixed(1)} km)`
         : "No known place nearby";
 
-    const quickSummary = `${placeDescription}. Nearby NPCs (2 km): ${nearbyNpcs}.`;
+    const mapboxLine = lastMapboxSummary ? `Mapbox: ${lastMapboxSummary}. ` : "";
+    const quickSummary = `${mapboxLine}${placeDescription}. Nearby NPCs (2 km): ${nearbyNpcs}.`;
     setLocationInfo(quickSummary);
     setLocationInfoLLM(null);
 
@@ -435,7 +477,13 @@ export default function Globe() {
     const requestLocation = { ...clickedLocation };
     setIsGeneratingWhatsHere(true);
 
-    generateWhatsHere(character._id, requestLocation.longitude, requestLocation.latitude, quickSummary)
+    generateWhatsHere(
+      character._id,
+      requestLocation.longitude,
+      requestLocation.latitude,
+      quickSummary,
+      lastMapboxSummary || undefined
+    )
       .then((result) => {
         if (whatsHereRequestId.current !== requestId) return;
         setLocationInfoLLM(result.description || null);
@@ -443,9 +491,7 @@ export default function Globe() {
       .catch((error: unknown) => {
         if (whatsHereRequestId.current !== requestId) return;
         const message =
-          error instanceof Error && error.message
-            ? `Generated context unavailable: ${error.message}`
-            : "Generated context unavailable.";
+          error instanceof Error && error.message ? `Generated context unavailable: ${error.message}` : "Generated context unavailable.";
         setLocationInfoLLM(message);
       })
       .finally(() => {
@@ -481,6 +527,29 @@ export default function Globe() {
       setIsTraveling(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoGenerateWhatsHere || !clickedLocation) return;
+    showWhatsHere();
+    setAutoGenerateWhatsHere(false);
+  }, [autoGenerateWhatsHere, clickedLocation, showWhatsHere]);
+
+  useEffect(() => {
+    if (!map.current || !clickedLocation) return;
+
+    const syncPopupPoint = () => {
+      updatePopupPointFromCoordinates(clickedLocation.longitude, clickedLocation.latitude);
+    };
+
+    syncPopupPoint();
+    map.current.on("move", syncPopupPoint);
+    map.current.on("resize", syncPopupPoint);
+
+    return () => {
+      map.current?.off("move", syncPopupPoint);
+      map.current?.off("resize", syncPopupPoint);
+    };
+  }, [clickedLocation]);
 
   return (
     <>
@@ -549,13 +618,21 @@ export default function Globe() {
 
       {clickedLocation && clickedPoint && (
         <div
-          className="pointer-events-auto absolute z-20 w-[320px] max-w-[92vw] rounded-xl border border-[#d1cbc3] bg-[#f9f7f3]/95 p-3 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
+          className="pointer-events-auto absolute z-20 w-[340px] max-w-[92vw] rounded-xl border border-[#d1cbc3] bg-[#f9f7f3]/95 p-3 font-mono text-xs text-[#1a1714] backdrop-blur-sm shadow-xl"
           style={{ left: `${clickedPoint.x}px`, top: `${clickedPoint.y}px` }}
         >
-          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-[#5f5a53]">
-            <span>
-              {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
-            </span>
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-[#7a756d]">Selected location</p>
+              {lastMapboxSummary && (
+                <p className="mt-1 truncate rounded border border-[#d1cbc3] bg-[#fffefc] px-1.5 py-0.5 text-[10px] text-[#5f5a53]">
+                  {lastMapboxSummary}
+                </p>
+              )}
+              <p className="mt-1 text-[11px] text-[#5f5a53]">
+                {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
+              </p>
+            </div>
             <button
               onClick={clearClickedSelection}
               className="rounded border border-[#d1cbc3] bg-[#f9f7f3] px-1.5 py-0.5 text-[10px] leading-none text-[#1a1714]"
@@ -567,23 +644,31 @@ export default function Globe() {
           <div className="flex gap-2">
             <button
               onClick={showWhatsHere}
-              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] px-3 py-2 text-xs text-[#1a1714]"
+              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#fffefc] px-3 py-2 text-xs text-[#1a1714]"
             >
               whats here
             </button>
             <button
               onClick={travelHere}
               disabled={!character?._id || isTraveling}
-              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] px-3 py-2 text-xs text-[#1a1714] disabled:opacity-50"
+              className="flex-1 rounded-lg border border-[#b91c1c] bg-[#dc2626] px-3 py-2 text-xs text-[#fffefc] disabled:opacity-50"
             >
               {isTraveling ? "traveling..." : "travel here"}
             </button>
           </div>
-          {locationInfo && <p className="mt-2 text-[11px] text-[#5f5a53]">{locationInfo}</p>}
-          {isGeneratingWhatsHere && (
-            <p className="mt-2 text-[11px] text-[#5f5a53]">Generating details...</p>
+          {locationInfo && (
+            <div className="mt-3 rounded border border-[#d1cbc3] bg-[#fffefc] px-2 py-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-[#7a756d]">Quick read</p>
+              <p className="mt-1 text-[11px] text-[#5f5a53]">{locationInfo}</p>
+            </div>
           )}
-          {locationInfoLLM && <p className="mt-2 text-[11px] text-[#5f5a53]">{locationInfoLLM}</p>}
+          {isGeneratingWhatsHere && <p className="mt-2 text-[11px] text-[#7a756d]">Generating details...</p>}
+          {locationInfoLLM && (
+            <div className="mt-2 rounded border border-[#d1cbc3] bg-[#fffefc] px-2 py-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-[#7a756d]">Context</p>
+              <p className="mt-1 text-[11px] text-[#5f5a53]">{locationInfoLLM}</p>
+            </div>
+          )}
         </div>
       )}
     </>

@@ -25,12 +25,7 @@ export async function sendChatMessage(characterID: string, npcID: string, conten
   });
 }
 
-export async function sendChatImage(
-  characterID: string,
-  npcID: string,
-  imagePrompt: string,
-  imageURL: string
-) {
+export async function sendChatImage(characterID: string, npcID: string, imagePrompt: string, imageURL: string) {
   return apiFetch("/sandbox-runtime/chat", {
     method: "POST",
     body: JSON.stringify({
@@ -44,11 +39,7 @@ export async function sendChatImage(
   });
 }
 
-export async function generateChatImagePreview(
-  characterID: string,
-  npcID: string,
-  imagePrompt: string
-) {
+export async function generateChatImagePreview(characterID: string, npcID: string, imagePrompt: string) {
   return apiFetch("/sandbox-runtime/chat/image-preview", {
     method: "POST",
     body: JSON.stringify({
@@ -84,7 +75,13 @@ export async function travelCharacter(characterID: string, longitude: number, la
   });
 }
 
-export async function generateWhatsHere(characterID: string, longitude: number, latitude: number, quickSummary: string) {
+export async function generateWhatsHere(
+  characterID: string,
+  longitude: number,
+  latitude: number,
+  quickSummary: string,
+  mapboxSummary?: string
+) {
   return apiFetch<{ description: string }>("/sandbox-runtime/whats-here", {
     method: "POST",
     body: JSON.stringify({
@@ -93,6 +90,7 @@ export async function generateWhatsHere(characterID: string, longitude: number, 
       longitude,
       latitude,
       quickSummary,
+      mapboxSummary,
     }),
   });
 }
