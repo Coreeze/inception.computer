@@ -504,7 +504,13 @@ async function generateNPCWeeklyPlan({
   });
 }
 
-export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocument }): Promise<IBeing[]> {
+export async function generateAllNPCPlans({
+  sandbox,
+  mainCharacter,
+}: {
+  sandbox: ISandboxDocument;
+  mainCharacter?: IBeing;
+}): Promise<IBeing[]> {
   const npcs = await Being.find({
     sandbox: sandbox._id,
     is_main: { $ne: true },
@@ -518,24 +524,27 @@ export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocume
   const updatedNpcIds = new Set<string>();
 
   if (sandbox.free_will_enabled) {
-    const mainCharacter = await Being.findOne({
-      sandbox: sandbox._id,
-      is_main: true,
-      is_dead: { $ne: true },
-      is_deleted: { $ne: true },
-    });
-    if (mainCharacter && (!mainCharacter.ai_action_queue || mainCharacter.ai_action_queue.length <= 7)) {
+    const mainCharacterDoc =
+      mainCharacter ||
+      (await Being.findOne({
+        sandbox: sandbox._id,
+        is_main: true,
+        is_dead: { $ne: true },
+        is_deleted: { $ne: true },
+      }));
+    if (mainCharacterDoc && (!mainCharacterDoc.ai_action_queue || mainCharacterDoc.ai_action_queue.length <= 7)) {
       try {
         const mainActions = await generateMainWeeklyPlan({
-          mainCharacter,
+          mainCharacter: mainCharacterDoc,
           sandbox,
           otherNpcs: npcs,
         });
-        console.log("Main character actions:", mainActions);
-        const existingQueue = mainCharacter.ai_action_queue || [];
+        const existingQueue = mainCharacterDoc.ai_action_queue || [];
         const updatedQueue = [...mainActions, ...existingQueue].slice(0, MAX_AI_QUEUE_SIZE);
-        mainCharacter.ai_action_queue = updatedQueue;
-        await mainCharacter.save();
+        mainCharacterDoc.ai_action_queue = updatedQueue;
+        if (!mainCharacter) {
+          await mainCharacterDoc.save();
+        }
       } catch (err) {
         console.error("Main character AI plan generation failed:", err);
       }

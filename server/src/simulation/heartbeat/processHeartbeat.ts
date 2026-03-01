@@ -351,13 +351,15 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     life_mission: character.life_mission?.progress ?? 0,
   };
 
-  await broadcastHeartbeat({
+  const heartbeatContext = {
     character,
     sandbox,
     npcs,
     heartbeatCount: sandbox.heartbeat_count || 0,
     milestoneEvents,
-  });
+  };
+  await broadcastHeartbeat(heartbeatContext);
+  npcs = heartbeatContext.npcs;
 
   if (character.is_dead) {
     await character.save();

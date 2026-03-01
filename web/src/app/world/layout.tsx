@@ -79,19 +79,32 @@ export default function WorldLayout({
         setDayStartedAt(Date.now());
       }
       const current = useWorldStorage.getState().character;
-      if (current && data.stats) {
+      if (current) {
+        const ca = data?.characterAction;
         setCharacter({
           ...current,
-          health_index: data.stats.health,
-          vibe_index: data.stats.vibe,
-          wealth_index: data.stats.money,
-          life_mission: current.life_mission
-            ? { ...current.life_mission, progress: data.stats.life_mission }
-            : undefined,
+          ...(data.stats
+            ? {
+                health_index: data.stats.health,
+                vibe_index: data.stats.vibe,
+                wealth_index: data.stats.money,
+                life_mission: current.life_mission
+                  ? { ...current.life_mission, progress: data.stats.life_mission }
+                  : undefined,
+              }
+            : {}),
+          ...(ca
+            ? {
+                current_action: ca.current_action,
+                current_longitude: ca.current_longitude ?? current.current_longitude,
+                current_latitude: ca.current_latitude ?? current.current_latitude,
+                current_place: ca.current_place,
+                current_city: ca.current_city,
+                current_country: ca.current_country,
+                player_action_queue: ca.player_action_queue,
+              }
+            : {}),
         });
-      }
-      if (data?.characterAction) {
-        useWorldStorage.getState().applyCharacterAction(data.characterAction);
       }
       if (data?.npcUpdates) {
         useWorldStorage.getState().applyNPCUpdates(data.npcUpdates);

@@ -16,6 +16,43 @@ import { io, playerSocketMap } from "../../index";
 import { formatSimDate } from "../../utils/formatSimDate";
 import { getPlayerSession } from "../../socket/sessionManager";
 
+const PERSISTED_PLACE_EPSILON = 0.0015;
+
+function normalizeMapboxPlaceName(mapboxSummary: unknown): string | undefined {
+  if (typeof mapboxSummary !== "string") return undefined;
+  const trimmed = mapboxSummary.trim();
+  if (!trimmed) return undefined;
+  const withoutCategory = trimmed.replace(/\s+\([^)]*\)\s*$/, "").trim();
+  return withoutCategory || undefined;
+}
+
+function buildFallbackPlaceName(latitude: number, longitude: number): string {
+  return `Saved point ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+}
+
+function buildWhatsHerePlaceImagePrompt(params: {
+  name: string;
+  description?: string;
+  city?: string;
+  country?: string;
+  mapboxSummary?: unknown;
+  quickSummary?: unknown;
+}): string {
+  const details = [
+    params.name,
+    params.description || "",
+    params.city || "",
+    params.country || "",
+    typeof params.mapboxSummary === "string" ? params.mapboxSummary.trim() : "",
+    typeof params.quickSummary === "string" ? params.quickSummary.trim() : "",
+  ]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+
+  return `sims 4 style, no text, no logos: ${details}`;
+}
+
 async function resolveChatParticipants(playerID: string, characterID: string, npcID: string) {
   const user = await User.findOne({ player_id: playerID });
   if (!user) {
@@ -556,8 +593,89 @@ export const whatsHereEndpoint = async (req: Request, res: Response) => {
     });
 
     const description = (generated?.description || "").trim();
+    const normalizedName = normalizeMapboxPlaceName(mapboxSummary) || buildFallbackPlaceName(latitude, longitude);
+    let persistedPlace: any = null;
+
+    try {
+      const nearbyPlaces = await Places.find({
+        main_character: character._id,
+        latitude: { $gte: latitude - PERSISTED_PLACE_EPSILON, $lte: latitude + PERSISTED_PLACE_EPSILON },
+        longitude: { $gte: longitude - PERSISTED_PLACE_EPSILON, $lte: longitude + PERSISTED_PLACE_EPSILON },
+      }).limit(20);
+
+      const normalizedNameLower = normalizedName.toLowerCase();
+      const existingByName = nearbyPlaces.find((place) => (place.name || "").trim().toLowerCase() === normalizedNameLower);
+      const existing = existingByName || nearbyPlaces[0];
+
+      if (existing) {
+        const nextDescription = description || existing.description;
+        const shouldUpdateDescription = !!nextDescription && nextDescription !== existing.description;
+        const shouldUpdateName = (existing.name || "").trim().toLowerCase() !== normalizedNameLower;
+        if (shouldUpdateDescription || shouldUpdateName) {
+          if (shouldUpdateDescription) existing.description = nextDescription;
+          if (shouldUpdateName) existing.name = normalizedName;
+          await existing.save();
+        }
+        persistedPlace = existing;
+      } else {
+        persistedPlace = await Places.create({
+          user: character.user,
+          sandbox: character.sandbox,
+          main_character: character._id,
+          name: normalizedName,
+          description: description || undefined,
+          latitude,
+          longitude,
+          introduced_via: "player_save",
+          introduced_by: character._id,
+          md: [
+            "Saved from map interaction.",
+            typeof mapboxSummary === "string" && mapboxSummary.trim() ? `Mapbox summary: ${mapboxSummary.trim()}` : "",
+            typeof quickSummary === "string" && quickSummary.trim() ? `Quick summary: ${quickSummary.trim()}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        });
+      }
+
+      if (persistedPlace && !persistedPlace.image_url) {
+        const imagePrompt = buildWhatsHerePlaceImagePrompt({
+          name: persistedPlace.name || normalizedName,
+          description: persistedPlace.description || description || undefined,
+          city: persistedPlace.city || undefined,
+          country: persistedPlace.country || undefined,
+        });
+        try {
+          const imageUrl = await generateFlux2FastImage(imagePrompt, { imageSize: "landscape_16_9" });
+          if (imageUrl) {
+            persistedPlace.image_url = imageUrl;
+            await persistedPlace.save();
+          }
+        } catch (imageError) {
+          console.error("Whats-here place image generation failed:", imageError);
+        }
+      }
+    } catch (persistError) {
+      console.error("Persist whats-here place error:", persistError);
+    }
+
     return res.json({
       description: description || "No additional context available right now.",
+      place: persistedPlace
+        ? {
+            _id: persistedPlace._id.toString(),
+            name: persistedPlace.name,
+            type: persistedPlace.type,
+            longitude: persistedPlace.longitude,
+            latitude: persistedPlace.latitude,
+            image_url: persistedPlace.image_url,
+            description: persistedPlace.description,
+            city: persistedPlace.city,
+            country: persistedPlace.country,
+            is_home: persistedPlace.is_home,
+            is_work: persistedPlace.is_work,
+          }
+        : null,
     });
   } catch (error: any) {
     console.error("Whats here error:", error);
@@ -622,15 +740,43 @@ export const doStuffSuggestEndpoint = async (req: Request, res: Response) => {
     const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
 
     const response = await completeJSON<{
-      option_a: { action: string; reason: string; city: string; country: string; place: string; longitude: number; latitude: number; action_type?: string; discovery_person?: any; discovery_place?: any; purchase?: any; pet?: any };
-      option_b: { action: string; reason: string; city: string; country: string; place: string; longitude: number; latitude: number; action_type?: string; discovery_person?: any; discovery_place?: any; purchase?: any; pet?: any };
+      option_a: {
+        action: string;
+        reason: string;
+        city: string;
+        country: string;
+        place: string;
+        longitude: number;
+        latitude: number;
+        action_type?: string;
+        discovery_person?: any;
+        discovery_place?: any;
+        purchase?: any;
+        pet?: any;
+      };
+      option_b: {
+        action: string;
+        reason: string;
+        city: string;
+        country: string;
+        place: string;
+        longitude: number;
+        latitude: number;
+        action_type?: string;
+        discovery_person?: any;
+        discovery_place?: any;
+        purchase?: any;
+        pet?: any;
+      };
     }>({
       model: "fast",
       systemPrompt: "You suggest 2 short life-simulation actions grounded in the character's mission, needs, and context. Return strict JSON only.",
       userPrompt: `CHARACTER:
 Name: ${character.first_name} ${character.last_name}
 Occupation: ${character.occupation || "Unknown"}
-Location: ${character.current_place || character.current_city || "Unknown"}, ${character.current_country || "Unknown"} (${character.current_longitude}, ${character.current_latitude})
+Location: ${character.current_place || character.current_city || "Unknown"}, ${character.current_country || "Unknown"} (${
+        character.current_longitude
+      }, ${character.current_latitude})
 Health: ${character.health_index ?? 0}/100
 Vibe: ${character.vibe_index ?? 0}/100
 Wealth: ${character.wealth_index ?? 0}

@@ -9,6 +9,7 @@ import useSimulationStorage from "@/store/SimulationStorage";
 import { setCharacterID } from "@/lib/api/index";
 import { generateBeingImage, generateWhatsHere, travelCharacter } from "@/lib/api/world";
 import { setFreeWill } from "@/lib/api/simulation";
+import { MapPlace } from "@/types/definitions";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -28,10 +29,12 @@ export default function Globe() {
   const [clickedPoint, setClickedPoint] = useState<{ x: number; y: number } | null>(null);
   const [locationInfo, setLocationInfo] = useState<string | null>(null);
   const [locationInfoLLM, setLocationInfoLLM] = useState<string | null>(null);
+  const [generatedPlace, setGeneratedPlace] = useState<MapPlace | null>(null);
   const [isTraveling, setIsTraveling] = useState(false);
   const [isGeneratingWhatsHere, setIsGeneratingWhatsHere] = useState(false);
   const [lastMapboxSummary, setLastMapboxSummary] = useState<string | null>(null);
   const [autoGenerateWhatsHere, setAutoGenerateWhatsHere] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const character = useWorldStorage((s) => s.character);
   const triggerFocusCoordinates = useWorldStorage((s) => s.triggerFocusCoordinates);
@@ -49,6 +52,7 @@ export default function Globe() {
   const setCharacter = useWorldStorage((s) => s.setCharacter);
   const updateBeingImage = useWorldStorage((s) => s.updateBeingImage);
   const mapPlaces = useWorldStorage((s) => s.mapPlaces);
+  const addMapPlace = useWorldStorage((s) => s.addMapPlace);
   const sandbox = useSimulationStorage((s) => s.sandbox);
   const freeWillEnabled = useSimulationStorage((s) => s.freeWillEnabled);
   const setFreeWillEnabled = useSimulationStorage((s) => s.setFreeWillEnabled);
@@ -212,6 +216,7 @@ export default function Globe() {
       updatePopupPointFromCoordinates(e.lngLat.lng, e.lngLat.lat);
       setLocationInfo(null);
       setLocationInfoLLM(null);
+      setGeneratedPlace(null);
       setIsGeneratingWhatsHere(false);
       setLastMapboxSummary(mapboxSummary);
       setAutoGenerateWhatsHere(!!mapboxSummary);
@@ -307,8 +312,7 @@ export default function Globe() {
         "#ff1a1a",
         `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
       );
-      markerEl.style.cssText = updated.style.cssText;
-      markerEl.className = "character-marker";
+      markerEl.classList.add("character-marker");
       markerEl.innerHTML = updated.innerHTML;
       characterMarker.current.setLngLat([character.current_longitude, character.current_latitude]);
       characterMarker.current.setPopup(characterPopup);
@@ -327,14 +331,14 @@ export default function Globe() {
     });
 
     for (const npc of npcs) {
-      if (npc.is_episodic || !npc.current_longitude || !npc.current_latitude) continue;
+      if (npc.is_episodic || npc.current_longitude == null || npc.current_latitude == null) continue;
 
       const existing = npcMarkers.current.get(npc._id);
       if (existing) {
         const markerEl = existing.getElement();
         markerEl.innerHTML = "";
         const updated = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
-        markerEl.style.cssText = updated.style.cssText;
+        markerEl.classList.add("npc-marker");
         markerEl.innerHTML = updated.innerHTML;
         existing.setLngLat([npc.current_longitude, npc.current_latitude]);
         existing.setPopup(
@@ -360,6 +364,7 @@ export default function Globe() {
         );
       } else {
         const el = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
+        el.classList.add("npc-marker");
 
         const marker = new mapboxgl.Marker({ element: el })
           .setLngLat([npc.current_longitude, npc.current_latitude])
@@ -414,6 +419,45 @@ export default function Globe() {
         ...(character ? [{ ...character, _discoverer: `${character.first_name} ${character.last_name}` }] : []),
         ...npcs.map((n) => ({ ...n, _discoverer: `${n.first_name || ""} ${n.last_name || ""}`.trim() })),
       ];
+
+      for (const place of mapPlaces) {
+        if (place.latitude == null || place.longitude == null) continue;
+        const key = `${place.longitude.toFixed(4)}_${place.latitude.toFixed(4)}_${(place.name || "").trim().toLowerCase()}`;
+        if (seenPlaces.has(key)) continue;
+        seenPlaces.add(key);
+
+        const el = document.createElement("div");
+        el.style.cssText = `
+          min-width: 22px; height: 22px; border-radius: 6px;
+          background: #14b8a6; border: 1px solid #f9f7f3;
+          display: flex; align-items: center; justify-content: center;
+          color: #1a1714; font-size: 10px; font-weight: 600;
+          font-family: 'IBM Plex Mono', monospace; cursor: pointer;
+          padding: 0 5px;
+          z-index: 6;
+        `;
+        el.textContent = "[S]";
+
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([place.longitude, place.latitude])
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(`
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+                ${
+                  place.image_url
+                    ? `<img src="${place.image_url}" alt="${place.name}" style="width:190px;height:106px;object-fit:cover;border-radius:6px;border:1px solid #d1cbc3;margin-bottom:6px;display:block;" />`
+                    : ""
+                }
+                <strong>${place.name}</strong><br/>
+                ${place.description ? `<span style="color: #7a756d;">${place.description}</span><br/>` : ""}
+                <span style="color: #7a756d; font-size: 10px;">Saved place</span>
+              </div>
+            `)
+          )
+          .addTo(map.current!);
+
+        discoveryMarkers.current.push(marker);
+      }
 
       for (const npc of discoverySources) {
         if (npc.discovered_places) {
@@ -495,7 +539,7 @@ export default function Globe() {
         }
       }
     }
-  }, [npcs, character, mapLoaded, showDiscoveriesOnMap]);
+  }, [npcs, character, mapLoaded, showDiscoveriesOnMap, mapPlaces]);
 
   useEffect(() => {
     if (!map.current || !character) return;
@@ -525,6 +569,17 @@ export default function Globe() {
     return () => document.removeEventListener("click", handler);
   }, [menuOpen]);
 
+  useEffect(() => {
+    const onFullScreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", onFullScreenChange);
+    onFullScreenChange();
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullScreenChange);
+    };
+  }, []);
+
   const goHome = () => {
     if (character?.home_longitude != null && character?.home_latitude != null) {
       triggerFocusCoordinates(character.home_longitude, character.home_latitude);
@@ -549,6 +604,18 @@ export default function Globe() {
     }
   };
 
+  const toggleFullScreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await document.documentElement.requestFullscreen();
+    } catch (error) {
+      console.error("Fullscreen toggle failed:", error);
+    }
+  };
+
   const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const dLat = toRad(lat2 - lat1);
@@ -563,6 +630,7 @@ export default function Globe() {
     setClickedPoint(null);
     setLocationInfo(null);
     setLocationInfoLLM(null);
+    setGeneratedPlace(null);
     setIsGeneratingWhatsHere(false);
     setLastMapboxSummary(null);
     setAutoGenerateWhatsHere(false);
@@ -621,6 +689,13 @@ export default function Globe() {
       .then((result) => {
         if (whatsHereRequestId.current !== requestId) return;
         setLocationInfoLLM(result.description || null);
+        if (result.place) {
+          setGeneratedPlace(result.place);
+          addMapPlace(result.place);
+          setShowDiscoveriesOnMap(true);
+        } else {
+          setGeneratedPlace(null);
+        }
       })
       .catch((error: unknown) => {
         if (whatsHereRequestId.current !== requestId) return;
@@ -730,6 +805,12 @@ export default function Globe() {
           >
             On map
           </button>
+          <button
+            onClick={toggleFullScreen}
+            className="rounded-lg border border-[#d1cbc3] bg-[#f9f7f3]/90 px-3 py-1.5 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
+          >
+            {isFullScreen ? "Exit full screen" : "Full screen"}
+          </button>
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -747,12 +828,7 @@ export default function Globe() {
                   Go home
                 </button>
                 <label className="flex w-full items-center gap-2 px-4 py-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={freeWillEnabled}
-                    onChange={toggleFreeWill}
-                    className="accent-[#1a1714]"
-                  />
+                  <input type="checkbox" checked={freeWillEnabled} onChange={toggleFreeWill} className="accent-[#1a1714]" />
                   free will
                 </label>
                 <button onClick={exitSession} className="block w-full px-4 py-2 text-left">
@@ -807,7 +883,17 @@ export default function Globe() {
               <p className="mt-1 text-[11px] text-[#5f5a53]">{locationInfo}</p>
             </div>
           )}
-          {isGeneratingWhatsHere && <p className="mt-2 text-[11px] text-[#7a756d]">Generating details...</p>}
+          {generatedPlace?.image_url && (
+            <div className="mt-2 rounded border border-[#d1cbc3] bg-[#fffefc] p-1.5">
+              <img
+                src={generatedPlace.image_url}
+                alt={generatedPlace.name || "Generated place"}
+                className="h-28 w-full rounded border border-[#d1cbc3] object-cover"
+              />
+              <p className="mt-1 text-[10px] uppercase tracking-wide text-[#7a756d]">Image</p>
+            </div>
+          )}
+          {isGeneratingWhatsHere && <p className="mt-2 text-[11px] text-[#7a756d]">Fetching details...</p>}
           {locationInfoLLM && (
             <div className="mt-2 rounded border border-[#d1cbc3] bg-[#fffefc] px-2 py-1.5">
               <p className="text-[10px] uppercase tracking-wide text-[#7a756d]">Context</p>

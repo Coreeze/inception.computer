@@ -12,7 +12,10 @@ export const npcQueueRefill: HeartbeatSubscriber = {
     const shouldRefillAnyNpc = ctx.npcs.some((npc) => (npc.ai_action_queue?.length || 0) <= 7);
     if (!shouldRefillMain && !shouldRefillAnyNpc) return;
     try {
-      const updated = await generateAllNPCPlans({ sandbox: ctx.sandbox });
+      const updated = await generateAllNPCPlans({
+        sandbox: ctx.sandbox,
+        mainCharacter: ctx.character,
+      });
       if (updated.length > 0) {
         ctx.npcs = updated;
       }

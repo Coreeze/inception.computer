@@ -11,7 +11,7 @@ interface FalImageResponse {
   };
 }
 
-export const IMAGE_STYLE_PREFIX = "sims 4 style, realistic, head-to-toe photo no text, no logos:";
+export const IMAGE_STYLE_PREFIX = "sims 4 style, realistic, photo no text, no logos:";
 
 interface GenerateFluxImageOptions {
   imageSize?: string;

@@ -104,7 +104,22 @@ export async function generateWhatsHere(
   quickSummary: string,
   mapboxSummary?: string
 ) {
-  return apiFetch<{ description: string }>("/sandbox-runtime/whats-here", {
+  return apiFetch<{
+    description: string;
+    place?: {
+      _id: string;
+      name: string;
+      type?: string;
+      longitude: number;
+      latitude: number;
+      image_url?: string;
+      description?: string;
+      city?: string;
+      country?: string;
+      is_home?: boolean;
+      is_work?: boolean;
+    } | null;
+  }>("/sandbox-runtime/whats-here", {
     method: "POST",
     body: JSON.stringify({
       playerID: getPlayerID(),

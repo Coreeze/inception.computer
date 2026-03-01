@@ -102,6 +102,7 @@ export interface MapPlace {
   image_url?: string;
   description?: string;
   city?: string;
+  country?: string;
   is_home?: boolean;
   is_work?: boolean;
 }
