@@ -71,3 +71,28 @@ export async function loadNotifications(characterID: string) {
 export async function loadHistory(sandboxID: string) {
   return apiFetch(`/sandbox/history/${sandboxID}`);
 }
+
+export async function travelCharacter(characterID: string, longitude: number, latitude: number) {
+  return apiFetch("/sandbox-runtime/travel", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      longitude,
+      latitude,
+    }),
+  });
+}
+
+export async function generateWhatsHere(characterID: string, longitude: number, latitude: number, quickSummary: string) {
+  return apiFetch<{ description: string }>("/sandbox-runtime/whats-here", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      longitude,
+      latitude,
+      quickSummary,
+    }),
+  });
+}

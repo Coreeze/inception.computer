@@ -7,19 +7,28 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import useWorldStorage from "@/store/WorldStorage";
 import useSimulationStorage from "@/store/SimulationStorage";
 import { setCharacterID } from "@/lib/api/index";
+import { generateWhatsHere, travelCharacter } from "@/lib/api/world";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
 export default function Globe() {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
+  const whatsHereRequestId = useRef(0);
   const map = useRef<mapboxgl.Map | null>(null);
   const characterMarker = useRef<mapboxgl.Marker | null>(null);
+  const clickedLocationMarker = useRef<mapboxgl.Marker | null>(null);
   const npcMarkers = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const discoveryMarkers = useRef<mapboxgl.Marker[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [clickedLocation, setClickedLocation] = useState<{ longitude: number; latitude: number } | null>(null);
+  const [clickedPoint, setClickedPoint] = useState<{ x: number; y: number } | null>(null);
+  const [locationInfo, setLocationInfo] = useState<string | null>(null);
+  const [locationInfoLLM, setLocationInfoLLM] = useState<string | null>(null);
+  const [isTraveling, setIsTraveling] = useState(false);
+  const [isGeneratingWhatsHere, setIsGeneratingWhatsHere] = useState(false);
 
   const character = useWorldStorage((s) => s.character);
   const triggerFocusCoordinates = useWorldStorage((s) => s.triggerFocusCoordinates);
@@ -34,6 +43,8 @@ export default function Globe() {
   const showDiscoveriesOnMap = useWorldStorage((s) => s.showDiscoveriesOnMap);
   const setShowDiscoveriesOnMap = useWorldStorage((s) => s.setShowDiscoveriesOnMap);
   const openProfile = useWorldStorage((s) => s.openProfile);
+  const setCharacter = useWorldStorage((s) => s.setCharacter);
+  const mapPlaces = useWorldStorage((s) => s.mapPlaces);
   const sandbox = useSimulationStorage((s) => s.sandbox);
 
   useEffect(() => {
@@ -53,7 +64,7 @@ export default function Globe() {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = new mapboxgl.Map({
+    const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/standard",
       center: [2.3522, 48.8566],
@@ -61,13 +72,68 @@ export default function Globe() {
       projection: "globe",
       pitch: is3DView ? 45 : 0,
     });
+    map.current = mapInstance;
 
-    map.current.on("load", () => {
+    const onMapClick = (e: mapboxgl.MapMouseEvent) => {
+      const panelWidth = 320;
+      const panelHeight = 140;
+      const margin = 12;
+      const viewportWidth = mapContainer.current?.clientWidth ?? window.innerWidth;
+      const viewportHeight = mapContainer.current?.clientHeight ?? window.innerHeight;
+      const x = Math.min(
+        Math.max(e.point.x, margin),
+        Math.max(margin, viewportWidth - panelWidth - margin)
+      );
+      const y = Math.min(
+        Math.max(e.point.y, margin),
+        Math.max(margin, viewportHeight - panelHeight - margin)
+      );
+      whatsHereRequestId.current += 1;
+      setClickedLocation({ longitude: e.lngLat.lng, latitude: e.lngLat.lat });
+      setClickedPoint({ x, y });
+      setLocationInfo(null);
+      setLocationInfoLLM(null);
+      setIsGeneratingWhatsHere(false);
+
+      if (map.current) {
+        if (!clickedLocationMarker.current) {
+          const el = document.createElement("div");
+          el.style.cssText = `
+            width: 20px; height: 20px;
+            background: #ff3b30;
+            border: 2px solid #f9f7f3;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            position: relative;
+          `;
+          const centerDot = document.createElement("div");
+          centerDot.style.cssText = `
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #f9f7f3;
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+          `;
+          el.appendChild(centerDot);
+          clickedLocationMarker.current = new mapboxgl.Marker({ element: el });
+        }
+        clickedLocationMarker.current
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .addTo(map.current);
+      }
+    };
+
+    mapInstance.on("click", onMapClick);
+    mapInstance.on("load", () => {
       setMapLoaded(true);
     });
 
     return () => {
-      map.current?.remove();
+      clickedLocationMarker.current?.remove();
+      clickedLocationMarker.current = null;
+      mapInstance.off("click", onMapClick);
+      mapInstance.remove();
       map.current = null;
     };
   }, []);
@@ -312,6 +378,110 @@ export default function Globe() {
     setMenuOpen(false);
   };
 
+  const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  };
+
+  const clearClickedSelection = () => {
+    whatsHereRequestId.current += 1;
+    setClickedLocation(null);
+    setClickedPoint(null);
+    setLocationInfo(null);
+    setLocationInfoLLM(null);
+    setIsGeneratingWhatsHere(false);
+    clickedLocationMarker.current?.remove();
+    clickedLocationMarker.current = null;
+  };
+
+  const showWhatsHere = () => {
+    if (!clickedLocation) return;
+
+    const nearbyNpcs = npcs.filter((npc) => {
+      if (npc.current_longitude == null || npc.current_latitude == null) return false;
+      return distanceKm(
+        clickedLocation.latitude,
+        clickedLocation.longitude,
+        npc.current_latitude,
+        npc.current_longitude
+      ) <= 2;
+    }).length;
+
+    let nearestPlace: { name: string; distance: number } | null = null;
+    for (const place of mapPlaces) {
+      const d = distanceKm(clickedLocation.latitude, clickedLocation.longitude, place.latitude, place.longitude);
+      if (!nearestPlace || d < nearestPlace.distance) {
+        nearestPlace = { name: place.name, distance: d };
+      }
+    }
+
+    const placeDescription =
+      nearestPlace && nearestPlace.distance <= 15
+        ? `Nearest known place: ${nearestPlace.name} (${nearestPlace.distance.toFixed(1)} km)`
+        : "No known place nearby";
+
+    const quickSummary = `${placeDescription}. Nearby NPCs (2 km): ${nearbyNpcs}.`;
+    setLocationInfo(quickSummary);
+    setLocationInfoLLM(null);
+
+    if (!character?._id) return;
+
+    const requestId = ++whatsHereRequestId.current;
+    const requestLocation = { ...clickedLocation };
+    setIsGeneratingWhatsHere(true);
+
+    generateWhatsHere(character._id, requestLocation.longitude, requestLocation.latitude, quickSummary)
+      .then((result) => {
+        if (whatsHereRequestId.current !== requestId) return;
+        setLocationInfoLLM(result.description || null);
+      })
+      .catch((error: unknown) => {
+        if (whatsHereRequestId.current !== requestId) return;
+        const message =
+          error instanceof Error && error.message
+            ? `Generated context unavailable: ${error.message}`
+            : "Generated context unavailable.";
+        setLocationInfoLLM(message);
+      })
+      .finally(() => {
+        if (whatsHereRequestId.current === requestId) {
+          setIsGeneratingWhatsHere(false);
+        }
+      });
+  };
+
+  const travelHere = async () => {
+    if (!clickedLocation || !character?._id || isTraveling) return;
+    setIsTraveling(true);
+    setLocationInfo(null);
+    try {
+      await travelCharacter(character._id, clickedLocation.longitude, clickedLocation.latitude);
+      setCharacter({
+        ...character,
+        previous_longitude: character.current_longitude,
+        previous_latitude: character.current_latitude,
+        current_longitude: clickedLocation.longitude,
+        current_latitude: clickedLocation.latitude,
+        current_place: undefined,
+        current_city: undefined,
+        current_country: undefined,
+        current_action: "traveling",
+      });
+      triggerFocusCoordinates(clickedLocation.longitude, clickedLocation.latitude);
+      clearClickedSelection();
+    } catch (error: unknown) {
+      const message = error instanceof Error && error.message ? error.message : "Travel failed";
+      setLocationInfo(message);
+    } finally {
+      setIsTraveling(false);
+    }
+  };
+
   return (
     <>
       <div ref={mapContainer} className="w-full h-full" />
@@ -376,6 +546,46 @@ export default function Globe() {
           </div>
         </div>
       </div>
+
+      {clickedLocation && clickedPoint && (
+        <div
+          className="pointer-events-auto absolute z-20 w-[320px] max-w-[92vw] rounded-xl border border-[#d1cbc3] bg-[#f9f7f3]/95 p-3 font-mono text-xs text-[#1a1714] backdrop-blur-sm"
+          style={{ left: `${clickedPoint.x}px`, top: `${clickedPoint.y}px` }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-[#5f5a53]">
+            <span>
+              {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
+            </span>
+            <button
+              onClick={clearClickedSelection}
+              className="rounded border border-[#d1cbc3] bg-[#f9f7f3] px-1.5 py-0.5 text-[10px] leading-none text-[#1a1714]"
+              aria-label="Close"
+            >
+              x
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={showWhatsHere}
+              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] px-3 py-2 text-xs text-[#1a1714]"
+            >
+              whats here
+            </button>
+            <button
+              onClick={travelHere}
+              disabled={!character?._id || isTraveling}
+              className="flex-1 rounded-lg border border-[#d1cbc3] bg-[#f9f7f3] px-3 py-2 text-xs text-[#1a1714] disabled:opacity-50"
+            >
+              {isTraveling ? "traveling..." : "travel here"}
+            </button>
+          </div>
+          {locationInfo && <p className="mt-2 text-[11px] text-[#5f5a53]">{locationInfo}</p>}
+          {isGeneratingWhatsHere && (
+            <p className="mt-2 text-[11px] text-[#5f5a53]">Generating details...</p>
+          )}
+          {locationInfoLLM && <p className="mt-2 text-[11px] text-[#5f5a53]">{locationInfoLLM}</p>}
+        </div>
+      )}
     </>
   );
 }

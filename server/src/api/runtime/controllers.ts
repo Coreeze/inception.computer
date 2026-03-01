@@ -3,6 +3,7 @@ import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
 import { User } from "../../database/models/user";
 import { Chat } from "../../database/models/chat";
+import { Places } from "../../database/models/places";
 import { getChoice, deleteChoice } from "../../simulation/heartbeat/choiceStore";
 import {
   applyRuntimeAction,
@@ -325,5 +326,138 @@ export const generateChatImagePreviewEndpoint = async (req: Request, res: Respon
     if (message === "NPC not found") return res.status(404).json({ error: message });
     if (message === "Character does not belong to player") return res.status(403).json({ error: message });
     return res.status(400).json({ error: message });
+  }
+};
+
+export const travelCharacterEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, longitude, latitude } = req.body;
+
+    if (!playerID || !characterID || typeof longitude !== "number" || typeof latitude !== "number") {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      return res.status(400).json({ error: "Invalid coordinates" });
+    }
+
+    if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+      return res.status(400).json({ error: "Coordinates out of range" });
+    }
+
+    const user = await User.findOne({ player_id: playerID });
+    if (!user) return res.status(404).json({ error: "Player not found" });
+
+    const character = await Being.findById(characterID);
+    if (!character) return res.status(404).json({ error: "Character not found" });
+    if (character.user?.toString() !== user._id.toString()) {
+      return res.status(403).json({ error: "Character does not belong to player" });
+    }
+    if (character.is_dead) return res.status(403).json({ error: "Character is dead." });
+
+    character.previous_longitude = character.current_longitude;
+    character.previous_latitude = character.current_latitude;
+    character.current_longitude = longitude;
+    character.current_latitude = latitude;
+    character.current_place = undefined;
+    character.current_city = undefined;
+    character.current_country = undefined;
+    character.current_action = "traveling";
+    character.current_action_updated_at = new Date();
+    await character.save();
+
+    return res.json({
+      success: true,
+      characterAction: {
+        current_action: character.current_action,
+        current_longitude: character.current_longitude,
+        current_latitude: character.current_latitude,
+        current_place: character.current_place,
+        current_city: character.current_city,
+        current_country: character.current_country,
+        player_action_queue: character.player_action_queue || [],
+      },
+    });
+  } catch (error: any) {
+    console.error("Travel character error:", error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+export const whatsHereEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, longitude, latitude, quickSummary } = req.body;
+
+    if (!playerID || !characterID || typeof longitude !== "number" || typeof latitude !== "number") {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      return res.status(400).json({ error: "Invalid coordinates" });
+    }
+    if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+      return res.status(400).json({ error: "Coordinates out of range" });
+    }
+
+    const user = await User.findOne({ player_id: playerID });
+    if (!user) return res.status(404).json({ error: "Player not found" });
+
+    const character = await Being.findById(characterID);
+    if (!character) return res.status(404).json({ error: "Character not found" });
+    if (character.user?.toString() !== user._id.toString()) {
+      return res.status(403).json({ error: "Character does not belong to player" });
+    }
+
+    const allPlaces = await Places.find({
+      main_character: character._id,
+      is_deleted: { $ne: true },
+    }).select("name city country longitude latitude");
+
+    const nearbyNPCs = await Being.find({
+      main_character: character._id,
+      is_deleted: { $ne: true },
+      is_dead: { $ne: true },
+    }).select("first_name last_name current_action current_longitude current_latitude");
+
+    const placeContext = allPlaces
+      .slice(0, 25)
+      .map((p) => {
+        const lon = typeof p.longitude === "number" ? p.longitude.toFixed(4) : "n/a";
+        const lat = typeof p.latitude === "number" ? p.latitude.toFixed(4) : "n/a";
+        return `${p.name || "Unknown"} (${lat}, ${lon})`;
+      })
+      .join(", ");
+
+    const npcContext = nearbyNPCs
+      .slice(0, 25)
+      .map((n) => {
+        const name = `${n.first_name || ""} ${n.last_name || ""}`.trim() || "Unknown";
+        const lon = typeof n.current_longitude === "number" ? n.current_longitude.toFixed(4) : "n/a";
+        const lat = typeof n.current_latitude === "number" ? n.current_latitude.toFixed(4) : "n/a";
+        return `${name} [${n.current_action || "idle"}] (${lat}, ${lon})`;
+      })
+      .join(", ");
+
+    const generated = await completeJSON<{ description: string }>({
+      model: "fast",
+      systemPrompt:
+        "You write short location flavor text for a life simulation map. Return strict JSON with key 'description'.",
+      userPrompt: [
+        `Coordinates: latitude ${latitude.toFixed(6)}, longitude ${longitude.toFixed(6)}.`,
+        `Quick summary from UI: ${typeof quickSummary === "string" ? quickSummary : "none"}`,
+        `Known places context: ${placeContext || "none"}`,
+        `Known NPC context: ${npcContext || "none"}`,
+        "Write 1-2 short sentences. Keep it grounded and concrete. No markdown. No emojis.",
+        'Return JSON only: {"description":"..."}',
+      ].join("\n"),
+      maxTokens: 220,
+    });
+
+    const description = (generated?.description || "").trim();
+    return res.json({
+      description: description || "No additional context available right now.",
+    });
+  } catch (error: any) {
+    console.error("Whats here error:", error);
+    return res.status(400).json({ error: error.message });
   }
 };
