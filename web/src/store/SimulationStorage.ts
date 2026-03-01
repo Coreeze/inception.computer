@@ -29,6 +29,9 @@ interface SimulationState {
   dayStartedAt: number | null;
   setDayStartedAt: (t: number | null) => void;
 
+  freeWillEnabled: boolean;
+  setFreeWillEnabled: (enabled: boolean) => void;
+
   resetSimulation: () => void;
 }
 
@@ -58,12 +61,16 @@ const useSimulationStorage = create<SimulationState>()((set) => ({
   dayStartedAt: null,
   setDayStartedAt: (t) => set({ dayStartedAt: t }),
 
+  freeWillEnabled: false,
+  setFreeWillEnabled: (enabled) => set({ freeWillEnabled: enabled }),
+
   resetSimulation: () =>
     set({
       timeMode: "normal",
       runtimeStatus: { runtimeState: "paused" },
       lastStatChanges: null,
       dayStartedAt: null,
+      freeWillEnabled: false,
     }),
 }));
 

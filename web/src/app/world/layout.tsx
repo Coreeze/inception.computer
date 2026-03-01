@@ -48,6 +48,9 @@ export default function WorldLayout({
         setNpcs(data.npcs || []);
         setMapPlaces(data.places || []);
         setSandbox(data.sandbox);
+        if (data.sandbox?.free_will_enabled != null) {
+          useSimulationStorage.getState().setFreeWillEnabled(data.sandbox.free_will_enabled);
+        }
       })
       .catch((err) => console.error("Load world failed:", err))
       .finally(() => setIsLoadingSession(false));

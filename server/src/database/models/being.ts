@@ -152,7 +152,7 @@ const beingsSchema = new mongoose.Schema(
           health_impact: { type: Number },
           vibe_impact: { type: Number },
           wealth_impact: { type: Number },
-          action_type: { type: String, enum: ["move", "discover_place", "discover_person", "buy", "event"] },
+          action_type: { type: String, enum: ["move", "discover_place", "discover_person", "buy", "event", "marry", "child_birth", "adopt_pet", "change_occupation"] },
           discovery_place: {
             name: { type: String },
             description: { type: String },
@@ -172,6 +172,22 @@ const beingsSchema = new mongoose.Schema(
             description: { type: String },
           },
           event_participants: [{ type: ObjectId, ref: "Beings" }],
+          name_change: {
+            last_name: { type: String },
+          },
+          occupation_change: {
+            occupation: { type: String },
+          },
+          relationship_event: { type: String, enum: ["marriage", "child_birth"] },
+          family_membership: {
+            spouse_name: { type: String },
+            child_name: { type: String },
+          },
+          pet: {
+            species: { type: String },
+            name: { type: String },
+            acquisition_mode: { type: String, enum: ["meet", "buy", "adopt"] },
+          },
         },
       ],
       default: [],
@@ -270,11 +286,16 @@ export interface IPlannedAction {
   health_impact?: number;
   vibe_impact?: number;
   wealth_impact?: number;
-  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event";
+  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
   discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
   discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
   purchase?: { object_type: string; name: string; price: number; description?: string };
   event_participants?: (mongoose.Types.ObjectId | string)[];
+  name_change?: { last_name: string };
+  occupation_change?: { occupation: string };
+  relationship_event?: "marriage" | "child_birth";
+  family_membership?: { spouse_name?: string; child_name?: string };
+  pet?: { species: string; name?: string; acquisition_mode?: "meet" | "buy" | "adopt" };
 }
 
 export interface IQuest {

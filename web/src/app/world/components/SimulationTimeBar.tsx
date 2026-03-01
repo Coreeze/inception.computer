@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { postHeartbeat } from "@/lib/api/simulation";
+import { postHeartbeat, doStuffSuggest, doStuffSelect } from "@/lib/api/simulation";
 import { isCharacterDeadError, setCharacterID } from "@/lib/api/index";
 import useSimulationStorage from "@/store/SimulationStorage";
 import useWorldStorage from "@/store/WorldStorage";
@@ -56,6 +56,43 @@ export default function SimulationTimeBar({ showControls = true }: SimulationTim
 
   const setCharacter = useWorldStorage((s) => s.setCharacter);
   const setRuntimeStatus = useSimulationStorage((s) => s.setRuntimeStatus);
+  const applyCharacterAction = useWorldStorage((s) => s.applyCharacterAction);
+
+  const [doStuffLoading, setDoStuffLoading] = useState(false);
+  const [doStuffOptions, setDoStuffOptions] = useState<{ option_a: any; option_b: any } | null>(null);
+  const [doStuffSelecting, setDoStuffSelecting] = useState(false);
+
+  const handleDoStuff = async () => {
+    if (!character?._id || doStuffLoading) return;
+    setDoStuffLoading(true);
+    setDoStuffOptions(null);
+    try {
+      const res = await doStuffSuggest(character._id);
+      if (res?.suggestions) {
+        setDoStuffOptions(res.suggestions);
+      }
+    } catch (e) {
+      console.error("Do stuff suggest failed:", e);
+    } finally {
+      setDoStuffLoading(false);
+    }
+  };
+
+  const handleSelectDoStuff = async (option: any) => {
+    if (!character?._id || doStuffSelecting) return;
+    setDoStuffSelecting(true);
+    try {
+      const res = await doStuffSelect(character._id, option);
+      if (res?.characterAction) {
+        applyCharacterAction(res.characterAction);
+      }
+      setDoStuffOptions(null);
+    } catch (e) {
+      console.error("Do stuff select failed:", e);
+    } finally {
+      setDoStuffSelecting(false);
+    }
+  };
 
   const handleModeChange = async (mode: "normal" | "paused") => {
     if (!character?._id) return;
@@ -113,53 +150,101 @@ export default function SimulationTimeBar({ showControls = true }: SimulationTim
 
   return (
     <div className="flex w-full flex-col items-center gap-2 pointer-events-auto">
-      <div className="flex w-full gap-2">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="flex-1 rounded-xl border border-black/10 bg-white/80 px-2 py-1.5 text-center backdrop-blur"
-          >
-            <span className="text-[10px] text-black/50">{s.label}</span>
-            <span className={`ml-1 text-xs font-semibold tabular-nums ${s.color}`}>{s.value}</span>
+      {doStuffOptions && (
+        <div className="w-full rounded-2xl border border-black/10 bg-white/95 px-3.5 py-3 backdrop-blur-md shadow-lg">
+          <p className="text-[10px] uppercase tracking-widest text-black/30 mb-2.5">do stuff</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSelectDoStuff(doStuffOptions.option_a)}
+              disabled={doStuffSelecting}
+              className="flex-1 rounded-xl border border-black/8 bg-black/[0.03] px-3 py-2.5 text-left disabled:opacity-40"
+            >
+              <p className="text-[13px] font-medium text-black/85 leading-tight">{doStuffOptions.option_a.action}</p>
+              <p className="text-[10px] text-black/35 mt-1 leading-tight">{doStuffOptions.option_a.reason}</p>
+            </button>
+            <button
+              onClick={() => handleSelectDoStuff(doStuffOptions.option_b)}
+              disabled={doStuffSelecting}
+              className="flex-1 rounded-xl border border-black/8 bg-black/[0.03] px-3 py-2.5 text-left disabled:opacity-40"
+            >
+              <p className="text-[13px] font-medium text-black/85 leading-tight">{doStuffOptions.option_b.action}</p>
+              <p className="text-[10px] text-black/35 mt-1 leading-tight">{doStuffOptions.option_b.reason}</p>
+            </button>
           </div>
-        ))}
-      </div>
-      <div className="relative w-full overflow-hidden rounded-2xl border border-black/10 bg-white/80 px-3 py-2 backdrop-blur">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-black/60">{dateDisplay}</span>
-          {showControls && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleModeChange("paused")}
-                disabled={!isPlaying}
-                className={`rounded-full border px-2 py-1 text-xs transition-colors ${
-                  !isPlaying
-                    ? "border-red-600 bg-red-600 text-white shadow-sm cursor-default"
-                    : "border-black/10 bg-white/40 text-black/40"
-                }`}
-              >
-                Pause
-              </button>
-              <button
-                onClick={() => handleModeChange("normal")}
-                disabled={isPlaying}
-                className={`rounded-full border px-2 py-1 text-xs transition-colors ${
-                  isPlaying
-                    ? "border-red-600 bg-red-600 text-white shadow-sm cursor-default"
-                    : "border-black/10 bg-white/40 text-black/40"
-                }`}
-              >
-                Play
-              </button>
-            </div>
-          )}
-          <span className="text-xs text-black/60">{sandbox.current_year}</span>
+          <button
+            onClick={() => setDoStuffOptions(null)}
+            className="mt-2 w-full text-center text-[10px] text-black/25"
+          >
+            dismiss
+          </button>
         </div>
-        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/10">
-          <div
-            className="h-full rounded-full bg-black/30 transition-[width] duration-100 ease-linear"
-            style={{ width: `${progress * 100}%` }}
-          />
+      )}
+
+      <div className="w-full rounded-2xl border border-black/10 bg-white/85 backdrop-blur-md overflow-hidden shadow-sm">
+        {character?.current_action && (
+          <div className="px-3.5 pt-2.5 pb-2 border-b border-black/5">
+            <p className="text-[13px] font-medium text-black/80 leading-tight">{character.current_action}</p>
+            {character.current_place && (
+              <p className="text-[10px] text-black/35 mt-0.5">{character.current_place}</p>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 px-3.5 py-2 border-b border-black/5">
+          {stats.map((s) => (
+            <div key={s.label} className="flex items-baseline gap-0.5">
+              <span className="text-[9px] font-medium uppercase tracking-wide text-black/30">{s.label}</span>
+              <span className={`text-[12px] font-semibold tabular-nums ${s.color}`}>{s.value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-3.5 pt-2 pb-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] tabular-nums text-black/50">{dateDisplay}</span>
+            {showControls && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleDoStuff}
+                  disabled={!isPlaying || doStuffLoading}
+                  className="rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[11px] font-medium text-black/50 disabled:opacity-25"
+                >
+                  {doStuffLoading ? "..." : "do stuff"}
+                </button>
+                <div className="flex items-center rounded-full border border-black/8 bg-black/[0.03] p-0.5">
+                  <button
+                    onClick={() => handleModeChange("paused")}
+                    disabled={!isPlaying}
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      !isPlaying
+                        ? "bg-red-600 text-white shadow-sm"
+                        : "text-black/35"
+                    }`}
+                  >
+                    Pause
+                  </button>
+                  <button
+                    onClick={() => handleModeChange("normal")}
+                    disabled={isPlaying}
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      isPlaying
+                        ? "bg-red-600 text-white shadow-sm"
+                        : "text-black/35"
+                    }`}
+                  >
+                    Play
+                  </button>
+                </div>
+              </div>
+            )}
+            <span className="text-[11px] tabular-nums text-black/50">{sandbox.current_year}</span>
+          </div>
+          <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-black/[0.06]">
+            <div
+              className="h-full rounded-full bg-black/20 transition-[width] duration-100 ease-linear"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
         </div>
       </div>
     </div>

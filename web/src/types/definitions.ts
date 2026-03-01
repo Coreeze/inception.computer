@@ -24,6 +24,15 @@ export interface IPlannedAction {
   health_impact?: number;
   vibe_impact?: number;
   wealth_impact?: number;
+  action_type?: "move" | "discover_place" | "discover_person" | "buy" | "event" | "marry" | "child_birth" | "adopt_pet" | "change_occupation";
+  discovery_place?: { name: string; description?: string; latitude?: number; longitude?: number };
+  discovery_person?: { first_name: string; last_name?: string; description?: string; occupation?: string };
+  purchase?: { object_type: string; name: string; price: number; description?: string };
+  name_change?: { last_name: string };
+  occupation_change?: { occupation: string };
+  relationship_event?: "marriage" | "child_birth";
+  family_membership?: { spouse_name?: string; child_name?: string };
+  pet?: { species: string; name?: string; acquisition_mode?: "meet" | "buy" | "adopt" };
 }
 
 export interface IBeing {

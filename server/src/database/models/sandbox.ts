@@ -30,6 +30,8 @@ const sandboxSchema = new mongoose.Schema(
     object_types: { type: [String], default: [] },
     item_types: { type: [String], default: [] },
 
+    free_will_enabled: { type: Boolean, default: false },
+
     last_activity_at: { type: Date },
     md: { type: String, default: "" },
   },
@@ -57,6 +59,7 @@ export interface ISandbox {
   heartbeat_count: number;
   last_heartbeat_at?: Date;
   days_since_last_signal: number;
+  free_will_enabled: boolean;
   last_activity_at?: Date;
   md?: string;
   being_types: string[];

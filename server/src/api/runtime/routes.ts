@@ -1,11 +1,14 @@
 import { Router } from "express";
 import {
+  doStuffSelectEndpoint,
+  doStuffSuggestEndpoint,
   generateBeingImageEndpoint,
   generateChatImagePreviewEndpoint,
   generatePlaceImageEndpoint,
   heartbeatEndpoint,
   resolveChoiceEndpoint,
   sendChatMessageEndpoint,
+  setFreeWillEndpoint,
   travelCharacterEndpoint,
   whatsHereEndpoint,
 } from "./controllers";
@@ -22,5 +25,8 @@ runtimeRouter.post("/sandbox-runtime/being/image", generateBeingImageEndpoint);
 runtimeRouter.post("/sandbox-runtime/place/image", generatePlaceImageEndpoint);
 runtimeRouter.post("/sandbox-runtime/travel", travelCharacterEndpoint);
 runtimeRouter.post("/sandbox-runtime/whats-here", whatsHereEndpoint);
+runtimeRouter.post("/sandbox-runtime/free-will", setFreeWillEndpoint);
+runtimeRouter.post("/sandbox-runtime/do-stuff/suggest", doStuffSuggestEndpoint);
+runtimeRouter.post("/sandbox-runtime/do-stuff/select", doStuffSelectEndpoint);
 
 export { runtimeRouter };

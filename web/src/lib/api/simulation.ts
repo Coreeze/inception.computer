@@ -41,3 +41,35 @@ export async function resolveChoice(characterID: string, choice: "option_a" | "o
     }),
   });
 }
+
+export async function setFreeWill(characterID: string, enabled: boolean) {
+  return apiFetch("/sandbox-runtime/free-will", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      enabled,
+    }),
+  });
+}
+
+export async function doStuffSuggest(characterID: string) {
+  return apiFetch("/sandbox-runtime/do-stuff/suggest", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+    }),
+  });
+}
+
+export async function doStuffSelect(characterID: string, selectedAction: any) {
+  return apiFetch("/sandbox-runtime/do-stuff/select", {
+    method: "POST",
+    body: JSON.stringify({
+      playerID: getPlayerID(),
+      characterID,
+      selectedAction,
+    }),
+  });
+}

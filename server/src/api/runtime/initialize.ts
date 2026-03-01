@@ -3,8 +3,6 @@ import { User } from "../../database/models/user";
 import { Being } from "../../database/models/being";
 import { Sandbox } from "../../database/models/sandbox";
 import { Places } from "../../database/models/places";
-import { spawnNPCs } from "../../services/npc/spawnNPCs";
-import { generateAllNPCPlans } from "../../services/npc/planner";
 import { completeJSON } from "../../services/ai/openrouter";
 
 const CLASSIC_WORLD_STYLE_ID = "68d2400c61cd0dea7526beff";
@@ -100,30 +98,11 @@ export const initializeEndpoint = async (req: Request, res: Response) => {
       country: character.home_country,
     });
 
-    let npcs: any[] = [];
-    try {
-      npcs = await spawnNPCs({
-        userID: user._id,
-        mainCharacterID: character._id,
-        sandbox,
-        playerCity: character.home_city,
-        playerCountry: character.home_country,
-        playerLon: character.home_longitude,
-        playerLat: character.home_latitude,
-        count: 10,
-      });
-      generateAllNPCPlans({ sandbox }).catch((err) => {
-        console.error("NPC plan generation failed (background):", err);
-      });
-    } catch (err) {
-      console.error("NPC spawn/plan failed (continuing):", err);
-    }
-
     return res.json({
       character: character.toObject(),
       sandbox: sandbox.toObject(),
       places: [homePlace.toObject()],
-      npcs: npcs.map((n) => n.toObject?.() ?? n),
+      npcs: [],
     });
   } catch (error: any) {
     console.error("Initialize error:", error);

@@ -1,16 +1,17 @@
 import { ObjectId } from "mongodb";
-import { IBeing, IPlannedAction } from "../../database/models/being";
+import { Being, IBeing, IPlannedAction } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
 import { ObjectModel } from "../../database/models/object";
 import { Event } from "../../database/models/event";
+import { Places } from "../../database/models/places";
 import { MilestoneEvent, broadcastHeartbeat } from "./heartbeatSubscribers";
 import { StatusPraesens, interpretBeingStats } from "./statusPraesens";
 import { checkSignals } from "./signals";
 import { generateChoices } from "./generateChoices";
 import { formatSimDate } from "../../utils/formatSimDate";
 
-async function processNPCAction(
-  npc: IBeing,
+async function processBeingAction(
+  being: IBeing,
   action: IPlannedAction,
   character: IBeing,
   sandbox: ISandboxDocument,
@@ -18,52 +19,145 @@ async function processNPCAction(
   dateStr: string
 ): Promise<void> {
   const actionType = action.action_type || "move";
+  const isMain = !!being.is_main;
 
-  if (actionType === "discover_place" && action.discovery_place) {
+  if (action.place && action.longitude != null && action.latitude != null) {
+    const placeName = action.place.trim();
+    if (placeName) {
+      if (isMain) {
+        const existing = await Places.findOne({
+          main_character: character._id,
+          name: placeName,
+        });
+        if (!existing) {
+          const description =
+            actionType === "discover_place" && action.discovery_place?.description
+              ? action.discovery_place.description
+              : undefined;
+          try {
+            await Places.create({
+              user: character.user,
+              sandbox: sandbox._id,
+              main_character: character._id,
+              name: placeName,
+              description,
+              latitude: action.latitude,
+              longitude: action.longitude,
+              city: action.city,
+              country: action.country,
+              introduced_via: actionType === "discover_place" ? "player_discover" : "exploration",
+              introduced_by: being._id,
+            });
+          } catch {}
+        }
+      } else {
+        const places = being.discovered_places || [];
+        const alreadyKnown = places.some(
+          (p) => p.name?.toLowerCase() === placeName.toLowerCase()
+        );
+        if (!alreadyKnown) {
+          places.push({
+            name: placeName,
+            description: action.discovery_place?.description,
+            latitude: action.latitude,
+            longitude: action.longitude,
+          });
+          being.discovered_places = places;
+        }
+      }
+    }
+  }
+
+  if (actionType === "discover_place" && action.discovery_place && isMain) {
     const dp = action.discovery_place;
-    const places = npc.discovered_places || [];
-    places.push({
-      name: dp.name,
-      description: dp.description,
-      latitude: dp.latitude ?? action.latitude,
-      longitude: dp.longitude ?? action.longitude,
-    });
-    npc.discovered_places = places;
+    const dpName = (dp.name || action.place || "").trim();
+    if (dpName) {
+      const places = being.discovered_places || [];
+      const alreadyKnown = places.some(
+        (p) => p.name?.toLowerCase() === dpName.toLowerCase()
+      );
+      if (!alreadyKnown) {
+        places.push({
+          name: dpName,
+          description: dp.description,
+          latitude: dp.latitude ?? action.latitude,
+          longitude: dp.longitude ?? action.longitude,
+        });
+        being.discovered_places = places;
+      }
+    }
   }
 
   if (actionType === "discover_person" && action.discovery_person) {
     const dperson = action.discovery_person;
-    const people = npc.discovered_people || [];
-    people.push({
-      first_name: dperson.first_name,
-      last_name: dperson.last_name,
-      description: dperson.description,
-      occupation: dperson.occupation,
-    });
-    npc.discovered_people = people;
+    const personFirstName = (dperson.first_name || "").trim();
+    if (personFirstName) {
+      const people = being.discovered_people || [];
+      people.push({
+        first_name: personFirstName,
+        last_name: dperson.last_name,
+        description: dperson.description,
+        occupation: dperson.occupation,
+      });
+      being.discovered_people = people;
+
+      if (isMain) {
+        const existing = await Being.findOne({
+          sandbox: sandbox._id,
+          first_name: personFirstName,
+          last_name: dperson.last_name || undefined,
+          is_deleted: { $ne: true },
+        });
+        if (!existing) {
+          try {
+            await Being.create({
+              user: character.user,
+              sandbox: sandbox._id,
+              species: "human",
+              self_awareness: "aware",
+              is_main: false,
+              main_character: character._id,
+              first_name: personFirstName,
+              last_name: dperson.last_name,
+              occupation: dperson.occupation,
+              description: dperson.description,
+              home_longitude: action.longitude ?? character.current_longitude,
+              home_latitude: action.latitude ?? character.current_latitude,
+              home_city: action.city || character.current_city,
+              home_country: action.country || character.current_country,
+              current_longitude: action.longitude ?? character.current_longitude,
+              current_latitude: action.latitude ?? character.current_latitude,
+              current_city: action.city,
+              current_country: action.country,
+              relationship_to_main_character: "acquaintance",
+            });
+          } catch {}
+        }
+      }
+    }
   }
 
   if (actionType === "buy" && action.purchase) {
     const p = action.purchase;
-    const wealth = npc.wealth_index ?? 0;
+    const wealth = being.wealth_index ?? 0;
     if (wealth >= p.price) {
       await ObjectModel.create({
         sandbox: sandbox._id,
         name: p.name,
         type: p.object_type,
         description: p.description,
-        owner: npc._id,
-        ownerType: "npc",
+        owner: being._id,
+        ownerType: isMain ? "character" : "npc",
         purchase_price: p.price,
       });
-      npc.wealth_index = wealth - p.price;
+      being.wealth_index = wealth - p.price;
     }
   }
 
   if (actionType === "event") {
-    const participantIds = [npc._id, ...(action.event_participants || [])];
+    const participantIds = [being._id, ...(action.event_participants || [])];
     const participantNames = [
-      `${npc.first_name} ${npc.last_name}`,
+      `${being.first_name} ${being.last_name}`,
       ...(action.event_participants || []).map((id) => {
         const found = npcs.find((n) => n._id.toString() === id.toString());
         return found ? `${found.first_name} ${found.last_name}` : "Unknown";
@@ -76,7 +170,7 @@ async function processNPCAction(
       sim_year: sandbox.current_year,
       sim_month: sandbox.current_month,
       sim_day: sandbox.current_day,
-      title: `${npc.first_name} ${npc.last_name} - ${action.action}`,
+      title: `${being.first_name} ${being.last_name} - ${action.action}`,
       description: action.reason,
       longitude: action.longitude,
       latitude: action.latitude,
@@ -84,6 +178,107 @@ async function processNPCAction(
       participants: participantIds,
       participant_names: participantNames,
     });
+  }
+
+  if (actionType === "adopt_pet" && action.pet) {
+    const pet = action.pet;
+    if (isMain) {
+      try {
+        await Being.create({
+          user: character.user,
+          sandbox: sandbox._id,
+          species: pet.species || "animal",
+          self_awareness: "unaware",
+          is_main: false,
+          main_character: character._id,
+          first_name: pet.name || pet.species,
+          home_longitude: being.current_longitude,
+          home_latitude: being.current_latitude,
+          home_city: being.current_city,
+          home_country: being.current_country,
+          current_longitude: being.current_longitude,
+          current_latitude: being.current_latitude,
+        });
+      } catch {}
+    }
+    being.life_md = (being.life_md || "") + `\n${dateStr}: Adopted ${pet.name || pet.species} (${pet.species}).`;
+  }
+
+  if (actionType === "marry" && action.family_membership?.spouse_name) {
+    const spouseName = action.family_membership.spouse_name;
+    being.relationship_status = "married";
+    being.life_md = (being.life_md || "") + `\n${dateStr}: Married ${spouseName} in ${action.city || "Unknown"}, ${action.country || "Unknown"}.`;
+    if (action.name_change?.last_name) {
+      const oldLast = being.last_name || "";
+      being.last_name = action.name_change.last_name;
+      being.life_md = (being.life_md || "") + `\n${dateStr}: Changed last name from ${oldLast} to ${action.name_change.last_name} after marriage with ${spouseName}.`;
+    }
+
+    if (isMain) {
+      const existing = await Being.findOne({
+        sandbox: sandbox._id,
+        first_name: spouseName.split(" ")[0],
+        is_deleted: { $ne: true },
+      });
+      if (!existing) {
+        try {
+          await Being.create({
+            user: character.user,
+            sandbox: sandbox._id,
+            species: "human",
+            self_awareness: "aware",
+            is_main: false,
+            main_character: character._id,
+            first_name: spouseName.split(" ")[0] || spouseName,
+            last_name: spouseName.split(" ").slice(1).join(" ") || being.last_name,
+            relationship_to_main_character: "spouse",
+            relationship_status: "married",
+            home_longitude: being.home_longitude,
+            home_latitude: being.home_latitude,
+            home_city: being.home_city,
+            home_country: being.home_country,
+            current_longitude: being.current_longitude,
+            current_latitude: being.current_latitude,
+          });
+        } catch {}
+      }
+    }
+  }
+
+  if (actionType === "child_birth" && action.family_membership?.child_name) {
+    const childName = action.family_membership.child_name;
+    being.life_md = (being.life_md || "") + `\n${dateStr}: Welcomed child ${childName}.`;
+
+    if (isMain) {
+      try {
+        await Being.create({
+          user: character.user,
+          sandbox: sandbox._id,
+          species: "human",
+          self_awareness: "aware",
+          is_main: false,
+          main_character: character._id,
+          first_name: childName.split(" ")[0] || childName,
+          last_name: being.last_name,
+          relationship_to_main_character: "child",
+          birth_year: sandbox.current_year,
+          birth_month: sandbox.current_month,
+          birth_day: sandbox.current_day,
+          home_longitude: being.home_longitude,
+          home_latitude: being.home_latitude,
+          home_city: being.home_city,
+          home_country: being.home_country,
+          current_longitude: being.current_longitude,
+          current_latitude: being.current_latitude,
+        });
+      } catch {}
+    }
+  }
+
+  if (actionType === "change_occupation" && action.occupation_change?.occupation) {
+    const oldOcc = being.occupation || "Unknown";
+    being.occupation = action.occupation_change.occupation;
+    being.life_md = (being.life_md || "") + `\n${dateStr}: Transitioned occupation from ${oldOcc} to ${action.occupation_change.occupation}.`;
   }
 }
 
@@ -201,20 +396,28 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
 
   const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
 
+  let charAction: IPlannedAction | undefined;
   if (character.player_action_queue?.length) {
-    const action = character.player_action_queue.shift();
-    if (action && !action.is_idle) {
-      character.current_action = action.action;
-      character.current_longitude = action.longitude ?? character.current_longitude;
-      character.current_latitude = action.latitude ?? character.current_latitude;
-      character.current_place = action.place;
-      character.current_city = action.city;
-      character.current_country = action.country;
-      character.current_action_updated_at = new Date();
-      const place = action.place ? ` at ${action.place}` : "";
-      character.life_md = (character.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+    charAction = character.player_action_queue.shift();
+  } else if (sandbox.free_will_enabled && character.ai_action_queue?.length) {
+    charAction = character.ai_action_queue.shift() as IPlannedAction | undefined;
+  }
+
+  if (charAction && !charAction.is_idle) {
+    await processBeingAction(character, charAction, character, sandbox, npcs, dateStr);
+    character.current_action = charAction.action;
+    character.current_longitude = charAction.longitude ?? character.current_longitude;
+    character.current_latitude = charAction.latitude ?? character.current_latitude;
+    character.current_place = charAction.place;
+    character.current_city = charAction.city;
+    character.current_country = charAction.country;
+    character.current_action_updated_at = new Date();
+    const actionType = charAction.action_type || "move";
+    if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
+      const place = charAction.place ? ` at ${charAction.place}` : "";
+      character.life_md = (character.life_md || "") + `\n${dateStr}: ${charAction.action}${place}`;
     }
-  } else {
+  } else if (!charAction) {
     character.current_action = undefined;
   }
 
@@ -223,15 +426,18 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     if (npc.ai_action_queue?.length) {
       const action = npc.ai_action_queue.shift() as IPlannedAction | undefined;
       if (action) {
-        await processNPCAction(npc, action, character, sandbox, npcs, dateStr);
+        await processBeingAction(npc, action, character, sandbox, npcs, dateStr);
         npc.current_action = action.action;
         npc.current_longitude = action.longitude ?? npc.current_longitude;
         npc.current_latitude = action.latitude ?? npc.current_latitude;
         npc.current_place = action.place;
         npc.current_city = action.city;
         npc.current_country = action.country;
-        const place = action.place ? ` at ${action.place}` : "";
-        npc.life_md = (npc.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+        const actionType = action.action_type || "move";
+        if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
+          const place = action.place ? ` at ${action.place}` : "";
+          npc.life_md = (npc.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+        }
       }
     }
     npcUpdates.push({

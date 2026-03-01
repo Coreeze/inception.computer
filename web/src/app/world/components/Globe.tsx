@@ -8,6 +8,7 @@ import useWorldStorage from "@/store/WorldStorage";
 import useSimulationStorage from "@/store/SimulationStorage";
 import { setCharacterID } from "@/lib/api/index";
 import { generateBeingImage, generateWhatsHere, travelCharacter } from "@/lib/api/world";
+import { setFreeWill } from "@/lib/api/simulation";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -49,6 +50,8 @@ export default function Globe() {
   const updateBeingImage = useWorldStorage((s) => s.updateBeingImage);
   const mapPlaces = useWorldStorage((s) => s.mapPlaces);
   const sandbox = useSimulationStorage((s) => s.sandbox);
+  const freeWillEnabled = useSimulationStorage((s) => s.freeWillEnabled);
+  const setFreeWillEnabled = useSimulationStorage((s) => s.setFreeWillEnabled);
   const generatingImageIds = useRef<Set<string>>(new Set());
 
   const buildPopupAvatarHTML = (imageURL?: string, altLabel?: string, generateButtonHTML?: string) => {
@@ -407,7 +410,12 @@ export default function Globe() {
         return Math.abs(hash);
       };
 
-      for (const npc of npcs) {
+      const discoverySources = [
+        ...(character ? [{ ...character, _discoverer: `${character.first_name} ${character.last_name}` }] : []),
+        ...npcs.map((n) => ({ ...n, _discoverer: `${n.first_name || ""} ${n.last_name || ""}`.trim() })),
+      ];
+
+      for (const npc of discoverySources) {
         if (npc.discovered_places) {
           for (const p of npc.discovered_places) {
             if (p.latitude == null || p.longitude == null) continue;
@@ -434,7 +442,7 @@ export default function Globe() {
                   <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
                     <strong>${p.name}</strong><br/>
                     ${p.description ? `<span style="color: #7a756d;">${p.description}</span><br/>` : ""}
-                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${npc.first_name} ${npc.last_name}</span>
+                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${(npc as any)._discoverer || "Unknown"}</span>
                   </div>
                 `)
               )
@@ -476,7 +484,7 @@ export default function Globe() {
                     <strong>${fullName}</strong><br/>
                     ${person.occupation ? `<span style="color: #7a756d;">${person.occupation}</span><br/>` : ""}
                     ${person.description ? `<span style="color: #7a756d;">${person.description}</span><br/>` : ""}
-                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${npc.first_name} ${npc.last_name}</span>
+                    <span style="color: #7a756d; font-size: 10px;">Discovered by ${(npc as any)._discoverer || "Unknown"}</span>
                   </div>
                 `)
               )
@@ -487,7 +495,7 @@ export default function Globe() {
         }
       }
     }
-  }, [npcs, mapLoaded, showDiscoveriesOnMap]);
+  }, [npcs, character, mapLoaded, showDiscoveriesOnMap]);
 
   useEffect(() => {
     if (!map.current || !character) return;
@@ -528,6 +536,17 @@ export default function Globe() {
     setCharacterID(null);
     router.push("/create-world");
     setMenuOpen(false);
+  };
+
+  const toggleFreeWill = async () => {
+    if (!character?._id) return;
+    const next = !freeWillEnabled;
+    setFreeWillEnabled(next);
+    try {
+      await setFreeWill(character._id, next);
+    } catch {
+      setFreeWillEnabled(!next);
+    }
   };
 
   const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -727,6 +746,15 @@ export default function Globe() {
                 >
                   Go home
                 </button>
+                <label className="flex w-full items-center gap-2 px-4 py-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={freeWillEnabled}
+                    onChange={toggleFreeWill}
+                    className="accent-[#1a1714]"
+                  />
+                  free will
+                </label>
                 <button onClick={exitSession} className="block w-full px-4 py-2 text-left">
                   Exit
                 </button>

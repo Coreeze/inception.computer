@@ -14,6 +14,7 @@ import { generateFlux2FastImage } from "../../services/ai/fal";
 import { stringifyCharacter, stringifyNPC } from "../../services/character/serialize";
 import { io, playerSocketMap } from "../../index";
 import { formatSimDate } from "../../utils/formatSimDate";
+import { getPlayerSession } from "../../socket/sessionManager";
 
 async function resolveChatParticipants(playerID: string, characterID: string, npcID: string) {
   const user = await User.findOne({ player_id: playerID });
@@ -561,5 +562,174 @@ export const whatsHereEndpoint = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Whats here error:", error);
     return res.status(400).json({ error: error.message });
+  }
+};
+
+export const setFreeWillEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, enabled } = req.body;
+    if (!playerID || !characterID || typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const { character } = await resolvePlayerAndCharacter(playerID, characterID);
+    const sandbox = await Sandbox.findById(character.sandbox);
+    if (!sandbox) return res.status(404).json({ error: "Sandbox not found" });
+
+    sandbox.free_will_enabled = enabled;
+    await sandbox.save();
+
+    return res.json({ success: true, free_will_enabled: sandbox.free_will_enabled });
+  } catch (error: any) {
+    console.error("Set free will error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
+  }
+};
+
+export const doStuffSuggestEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID } = req.body;
+    if (!playerID || !characterID) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const session = getPlayerSession(playerID);
+    if (!session?.isPlaying) {
+      return res.status(409).json({ error: "Simulation must be playing" });
+    }
+
+    const { character } = await resolvePlayerAndCharacter(playerID, characterID);
+    if (character.is_dead) return res.status(403).json({ error: "Character is dead." });
+
+    const sandbox = await Sandbox.findById(character.sandbox);
+    if (!sandbox) return res.status(404).json({ error: "Sandbox not found" });
+
+    const npcs = await Being.find({
+      main_character: character._id,
+      is_deleted: { $ne: true },
+      is_dead: { $ne: true },
+    }).select("first_name last_name occupation current_action current_city current_country");
+
+    const npcContext = npcs
+      .slice(0, 15)
+      .map((n) => `${n.first_name || ""} ${n.last_name || ""} (${n.occupation || "unknown"})`.trim())
+      .join(", ");
+
+    const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
+
+    const response = await completeJSON<{
+      option_a: { action: string; reason: string; city: string; country: string; place: string; longitude: number; latitude: number; action_type?: string; discovery_person?: any; discovery_place?: any; purchase?: any; pet?: any };
+      option_b: { action: string; reason: string; city: string; country: string; place: string; longitude: number; latitude: number; action_type?: string; discovery_person?: any; discovery_place?: any; purchase?: any; pet?: any };
+    }>({
+      model: "fast",
+      systemPrompt: "You suggest 2 short life-simulation actions grounded in the character's mission, needs, and context. Return strict JSON only.",
+      userPrompt: `CHARACTER:
+Name: ${character.first_name} ${character.last_name}
+Occupation: ${character.occupation || "Unknown"}
+Location: ${character.current_place || character.current_city || "Unknown"}, ${character.current_country || "Unknown"} (${character.current_longitude}, ${character.current_latitude})
+Health: ${character.health_index ?? 0}/100
+Vibe: ${character.vibe_index ?? 0}/100
+Wealth: ${character.wealth_index ?? 0}
+Mission: ${character.life_mission?.name || "None"} (progress: ${character.life_mission?.progress ?? 0})
+Soul: ${(character.soul_md || "").slice(0, 120)}
+Recent life: ${(character.life_md || "").slice(-200)}
+Known people: ${npcContext || "none"}
+DATE: ${dateStr}
+
+Suggest exactly 2 actions. One should be low-friction (near current location), the other more ambitious.
+Most actions in real life involve discovering new places or meeting new people — prefer discover_place and discover_person over plain "move".
+Only use "move" if revisiting a known location with no new interaction.
+If discover_person, include discovery_person: {first_name, last_name, description, occupation}. Make them a unique, plausible individual.
+If discover_place, include discovery_place: {name, description, latitude, longitude}. Use a real, specific place with real coordinates.
+If adopt_pet, include pet: {species, name, acquisition_mode: "meet"|"buy"|"adopt"}.
+If buy, include purchase: {object_type, name, price, description}.
+
+action: first person, max 5 words, -ing verbs.
+reason: first person, exactly 7 words.
+Return JSON: {"option_a":{...},"option_b":{...}}
+Strict JSON only. No markdown. Minified.`,
+      maxTokens: 800,
+    });
+
+    return res.json({ suggestions: response });
+  } catch (error: any) {
+    console.error("Do stuff suggest error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
+  }
+};
+
+export const doStuffSelectEndpoint = async (req: Request, res: Response) => {
+  try {
+    const { playerID, characterID, selectedAction } = req.body;
+    if (!playerID || !characterID || !selectedAction) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const session = getPlayerSession(playerID);
+    if (!session?.isPlaying) {
+      return res.status(409).json({ error: "Simulation must be playing" });
+    }
+
+    const { character } = await resolvePlayerAndCharacter(playerID, characterID);
+    if (character.is_dead) return res.status(403).json({ error: "Character is dead." });
+
+    const action = {
+      action: selectedAction.action,
+      place: selectedAction.place,
+      reason: selectedAction.reason,
+      country: selectedAction.country,
+      city: selectedAction.city,
+      longitude: selectedAction.longitude,
+      latitude: selectedAction.latitude,
+      action_type: selectedAction.action_type,
+      discovery_place: selectedAction.discovery_place,
+      discovery_person: selectedAction.discovery_person,
+      purchase: selectedAction.purchase,
+      pet: selectedAction.pet,
+    };
+
+    const queue = character.player_action_queue || [];
+    if (queue.length === 0) {
+      character.current_action = action.action;
+      character.current_longitude = action.longitude ?? character.current_longitude;
+      character.current_latitude = action.latitude ?? character.current_latitude;
+      character.current_place = action.place;
+      character.current_city = action.city;
+      character.current_country = action.country;
+      character.current_action_updated_at = new Date();
+      queue.push(action);
+    } else {
+      queue.push(action);
+    }
+    character.player_action_queue = queue;
+    await character.save();
+
+    return res.json({
+      success: true,
+      characterAction: {
+        current_action: character.current_action,
+        current_longitude: character.current_longitude,
+        current_latitude: character.current_latitude,
+        current_place: character.current_place,
+        current_city: character.current_city,
+        current_country: character.current_country,
+        player_action_queue: character.player_action_queue || [],
+      },
+    });
+  } catch (error: any) {
+    console.error("Do stuff select error:", error);
+    const message = error?.message || "Request failed";
+    if (message === "Player not found") return res.status(404).json({ error: message });
+    if (message === "Character not found") return res.status(404).json({ error: message });
+    if (message === "Character does not belong to player") return res.status(403).json({ error: message });
+    return res.status(400).json({ error: message });
   }
 };
