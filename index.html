@@ -1343,7 +1343,7 @@
         <p class="hero-subline" style="color: #000000; background-color: red">what can go wrong?</p>
         <div class="hero-author">Cris Lenta</div>
         <div class="hero-event">Mistral AI Worldwide Hackathon · February 28 – March 1, 2026</div>
-        <a href="/create-world" class="hero-start">Start</a>
+        <a id="start-link" href="/create-world" class="hero-start">Start</a>
         <nav class="chapter-nav" style="color: red; background-color: black">
           <a href="#thesis" style="text-decoration: underline">The Thesis</a>
           <a href="#neuroscience" style="text-decoration: underline">Neuroscience</a>
@@ -2202,6 +2202,8 @@
     </div>
 
     <script>
+      document.getElementById("start-link").href = (window.WEB_URL || "") + "/create-world";
+
       const bg = document.getElementById("bgPixels");
       const sizes = [3, 4, 5, 6, 7, 8];
       const driftClasses = ["d1", "d2", "d3"];
