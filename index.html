@@ -349,6 +349,23 @@
         animation: fadeIn 1s ease 1s forwards;
       }
 
+      .hero-start {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #fff;
+        background: var(--green);
+        padding: 0.75em 2.4em;
+        text-decoration: none;
+        margin-bottom: 2.5rem;
+        opacity: 0;
+        animation: fadeIn 1s ease 1.05s forwards;
+        border: none;
+        cursor: pointer;
+      }
+
       .chapter-nav {
         border-top: 1px solid rgba(255, 255, 255, 0.15);
         border-bottom: 1px solid rgba(255, 255, 255, 0.15);
@@ -1326,6 +1343,7 @@
         <p class="hero-subline" style="color: #000000; background-color: red">what can go wrong?</p>
         <div class="hero-author">Cris Lenta</div>
         <div class="hero-event">Mistral AI Worldwide Hackathon · February 28 – March 1, 2026</div>
+        <a href="/create-world" class="hero-start">Start</a>
         <nav class="chapter-nav" style="color: red; background-color: black">
           <a href="#thesis" style="text-decoration: underline">The Thesis</a>
           <a href="#neuroscience" style="text-decoration: underline">Neuroscience</a>

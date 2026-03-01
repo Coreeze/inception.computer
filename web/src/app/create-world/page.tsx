@@ -52,7 +52,7 @@ export default function CreateWorldPage() {
   };
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center font-[family-name:var(--font-mono)] px-6 py-12">
+    <main className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12">
       <HolodeckBackground />
       <h1 className="relative z-20 text-4xl font-serif tracking-tight mb-2">Create your world</h1>
       <p className="relative z-20 text-[#7a756d] mb-8">Who do you want to be?</p>
