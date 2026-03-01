@@ -317,12 +317,22 @@ export async function generateMainWeeklyPlan({
   otherNpcs?: IBeing[];
   sandboxContext?: any;
 }): Promise<IPlannedAction[]> {
-  return generateBeingWeeklyPlan({
-    npc: mainCharacter,
-    sandbox,
-    otherNpcs,
-    sandboxContext,
+  const resolvedSandboxContext = sandboxContext || (await getSandboxContext(sandbox._id.toString()));
+  const compactContext = compactSandboxContext(resolvedSandboxContext);
+
+  const prompt = `${mainCharacter.first_name} ${mainCharacter.last_name}, currently in ${mainCharacter.home_city}/${mainCharacter.home_country} (${mainCharacter.home_latitude},${mainCharacter.home_longitude})
+Places: ${compactContext.places.join(", ") || "none"} | People: ${compactContext.people.join(", ") || "none"}
+${COMPACT_INSTRUCTIONS}
+IMPORTANT: This character is adventurous and loves to travel internationally. At least 3 of the 7 actions MUST take place in a DIFFERENT country than ${mainCharacter.home_country}. Pick real cities across different continents. Use accurate coordinates for those international destinations. The remaining actions can be near home (${mainCharacter.home_latitude},${mainCharacter.home_longitude}).
+Return: {"actions":[...7 actions...]}`;
+
+  const response = await completeJSON<{ actions: WeeklyPlanAction[] }>({
+    model: "fast",
+    systemPrompt: PLANNER_SYSTEM_PROMPT,
+    userPrompt: prompt,
   });
+
+  return sanitizeWeeklyActions(response.actions).map((a) => toPlannedAction(a, sandbox, otherNpcs));
 }
 
 async function generateNPCWeeklyPlan({
@@ -351,11 +361,6 @@ export async function generateAllNPCPlans({ sandbox, mainCharacter }: { sandbox:
     is_dead: { $ne: true },
     is_deleted: { $ne: true },
   });
-  const npcsNeedingRefill = npcs.filter((npc) => (npc.ai_action_queue?.length || 0) <= 7);
-
-  const historyEntries: any[] = [];
-  const updates: any[] = [];
-  const updatedNpcIds = new Set<string>();
 
   if (sandbox.free_will_enabled) {
     const mainCharacterDoc =
@@ -386,100 +391,108 @@ export async function generateAllNPCPlans({ sandbox, mainCharacter }: { sandbox:
     }
   }
 
-  if (npcs.length === 0) return [];
-  if (npcsNeedingRefill.length === 0) return npcs;
+  return npcs;
 
-  const sharedSandboxContext = await getSandboxContext(sandbox._id.toString(), npcsNeedingRefill[0]._id.toString());
-
-  const batchSize = 4;
-  for (let i = 0; i < npcsNeedingRefill.length; i += batchSize) {
-    const batch = npcsNeedingRefill.slice(i, i + batchSize);
-    let actionsByNpc = new Map<string, IPlannedAction[]>();
-
-    try {
-      actionsByNpc = await generateWeeklyPlansBatch({
-        npcs: batch,
-        sandbox,
-        sandboxContext: sharedSandboxContext,
-      });
-    } catch (error) {
-      console.error("Batch NPC plan generation failed, falling back to per-NPC planning:", error);
-    }
-
-    for (const npc of batch) {
-      const npcID = npc._id.toString();
-      let newActions = actionsByNpc.get(npcID);
-
-      if (!newActions || newActions.length === 0) {
-        try {
-          newActions = await generateNPCWeeklyPlan({
-            npc,
-            sandbox,
-            otherNpcs: npcs.filter((n) => !n._id.equals(npc._id)),
-            sandboxContext: sharedSandboxContext,
-          });
-        } catch (error) {
-          console.error(`Error generating plan for NPC ${npc._id}:`, error);
-          continue;
-        }
-      }
-
-      for (let idx = 0; idx < newActions.length; idx++) {
-        const action = newActions[idx];
-        const simDate = getSimDateWithOffset(sandbox.current_year, sandbox.current_month, sandbox.current_day, idx);
-        historyEntries.push({
-          sandbox: sandbox._id,
-          year: simDate.year,
-          month: simDate.month,
-          day: simDate.day,
-          type: "npc_movement",
-          actor_type: "npc",
-          actor_id: npc._id,
-          new_state: {
-            country: action.country,
-            city: action.city,
-            place: action.place,
-            longitude: action.longitude,
-            latitude: action.latitude,
-          },
-          description: `${npc.first_name} ${action.action}`,
-          metadata: { reason: action.reason },
-        });
-      }
-
-      const existingAIQueue = npc.ai_action_queue || [];
-      const updatedAIQueue = [...newActions, ...existingAIQueue].slice(0, MAX_AI_QUEUE_SIZE);
-      const firstAction = (npc.player_action_queue || [])[0] || updatedAIQueue[0];
-
-      updates.push({
-        updateOne: {
-          filter: { _id: npc._id },
-          update: {
-            $set: {
-              ai_action_queue: updatedAIQueue,
-              current_action: firstAction?.action,
-              current_longitude: firstAction?.longitude,
-              current_latitude: firstAction?.latitude,
-              current_action_updated_at: new Date(),
-            },
-          },
-        },
-      });
-      updatedNpcIds.add(npcID);
-    }
-  }
-
-  if (updates.length > 0) {
-    await Being.bulkWrite(updates).catch((err) => console.error("Error updating NPC plans:", err));
-  }
-
-  if (historyEntries.length > 0) {
-    await WorldHistory.insertMany(historyEntries).catch((err) => console.error("Error logging NPC movement history:", err));
-  }
-
-  if (updatedNpcIds.size === 0) return npcs;
-
-  const refreshed = await Being.find({ _id: { $in: Array.from(updatedNpcIds).map((id) => new ObjectId(id)) } });
-  const refreshedByID = new Map(refreshed.map((npc) => [npc._id.toString(), npc]));
-  return npcs.map((npc) => refreshedByID.get(npc._id.toString()) || npc);
+  // --- NPC planning disabled ---
+  // const npcsNeedingRefill = npcs.filter((npc) => (npc.ai_action_queue?.length || 0) <= 7);
+  // const historyEntries: any[] = [];
+  // const updates: any[] = [];
+  // const updatedNpcIds = new Set<string>();
+  //
+  // if (npcs.length === 0) return [];
+  // if (npcsNeedingRefill.length === 0) return npcs;
+  //
+  // const sharedSandboxContext = await getSandboxContext(sandbox._id.toString(), npcsNeedingRefill[0]._id.toString());
+  //
+  // const batchSize = 4;
+  // for (let i = 0; i < npcsNeedingRefill.length; i += batchSize) {
+  //   const batch = npcsNeedingRefill.slice(i, i + batchSize);
+  //   let actionsByNpc = new Map<string, IPlannedAction[]>();
+  //
+  //   try {
+  //     actionsByNpc = await generateWeeklyPlansBatch({
+  //       npcs: batch,
+  //       sandbox,
+  //       sandboxContext: sharedSandboxContext,
+  //     });
+  //   } catch (error) {
+  //     console.error("Batch NPC plan generation failed, falling back to per-NPC planning:", error);
+  //   }
+  //
+  //   for (const npc of batch) {
+  //     const npcID = npc._id.toString();
+  //     let newActions = actionsByNpc.get(npcID);
+  //
+  //     if (!newActions || newActions.length === 0) {
+  //       try {
+  //         newActions = await generateNPCWeeklyPlan({
+  //           npc,
+  //           sandbox,
+  //           otherNpcs: npcs.filter((n) => !n._id.equals(npc._id)),
+  //           sandboxContext: sharedSandboxContext,
+  //         });
+  //       } catch (error) {
+  //         console.error(`Error generating plan for NPC ${npc._id}:`, error);
+  //         continue;
+  //       }
+  //     }
+  //
+  //     for (let idx = 0; idx < newActions.length; idx++) {
+  //       const action = newActions[idx];
+  //       const simDate = getSimDateWithOffset(sandbox.current_year, sandbox.current_month, sandbox.current_day, idx);
+  //       historyEntries.push({
+  //         sandbox: sandbox._id,
+  //         year: simDate.year,
+  //         month: simDate.month,
+  //         day: simDate.day,
+  //         type: "npc_movement",
+  //         actor_type: "npc",
+  //         actor_id: npc._id,
+  //         new_state: {
+  //           country: action.country,
+  //           city: action.city,
+  //           place: action.place,
+  //           longitude: action.longitude,
+  //           latitude: action.latitude,
+  //         },
+  //         description: `${npc.first_name} ${action.action}`,
+  //         metadata: { reason: action.reason },
+  //       });
+  //     }
+  //
+  //     const existingAIQueue = npc.ai_action_queue || [];
+  //     const updatedAIQueue = [...newActions, ...existingAIQueue].slice(0, MAX_AI_QUEUE_SIZE);
+  //     const firstAction = (npc.player_action_queue || [])[0] || updatedAIQueue[0];
+  //
+  //     updates.push({
+  //       updateOne: {
+  //         filter: { _id: npc._id },
+  //         update: {
+  //           $set: {
+  //             ai_action_queue: updatedAIQueue,
+  //             current_action: firstAction?.action,
+  //             current_longitude: firstAction?.longitude,
+  //             current_latitude: firstAction?.latitude,
+  //             current_action_updated_at: new Date(),
+  //           },
+  //         },
+  //       },
+  //     });
+  //     updatedNpcIds.add(npcID);
+  //   }
+  // }
+  //
+  // if (updates.length > 0) {
+  //   await Being.bulkWrite(updates).catch((err) => console.error("Error updating NPC plans:", err));
+  // }
+  //
+  // if (historyEntries.length > 0) {
+  //   await WorldHistory.insertMany(historyEntries).catch((err) => console.error("Error logging NPC movement history:", err));
+  // }
+  //
+  // if (updatedNpcIds.size === 0) return npcs;
+  //
+  // const refreshed = await Being.find({ _id: { $in: Array.from(updatedNpcIds).map((id) => new ObjectId(id)) } });
+  // const refreshedByID = new Map(refreshed.map((npc) => [npc._id.toString(), npc]));
+  // return npcs.map((npc) => refreshedByID.get(npc._id.toString()) || npc);
 }

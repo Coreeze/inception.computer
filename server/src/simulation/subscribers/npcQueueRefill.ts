@@ -1,7 +1,4 @@
-import {
-  HeartbeatSubscriber,
-  HeartbeatContext,
-} from "../heartbeat/heartbeatSubscribers";
+import { HeartbeatSubscriber, HeartbeatContext } from "../heartbeat/heartbeatSubscribers";
 import { generateAllNPCPlans } from "../../services/npc/planner";
 
 export const npcQueueRefill: HeartbeatSubscriber = {
@@ -9,8 +6,8 @@ export const npcQueueRefill: HeartbeatSubscriber = {
   async onHeartbeat(ctx: HeartbeatContext) {
     const mainQueueLength = ctx.character.ai_action_queue?.length || 0;
     const shouldRefillMain = !!ctx.sandbox.free_will_enabled && mainQueueLength <= 7;
-    const shouldRefillAnyNpc = ctx.npcs.some((npc) => (npc.ai_action_queue?.length || 0) <= 7);
-    if (!shouldRefillMain && !shouldRefillAnyNpc) return;
+    // const shouldRefillAnyNpc = ctx.npcs.some((npc) => (npc.ai_action_queue?.length || 0) <= 7);
+    if (!shouldRefillMain) return;
     try {
       const updated = await generateAllNPCPlans({
         sandbox: ctx.sandbox,
