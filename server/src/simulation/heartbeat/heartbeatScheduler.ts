@@ -14,10 +14,7 @@ interface TickLoop {
 
 const loops = new Map<string, TickLoop>();
 
-export function startHeartbeatScheduler(
-  playerID: string,
-  characterID: string
-) {
+export function startHeartbeatScheduler(playerID: string, characterID: string) {
   const existing = loops.get(characterID);
   if (existing) {
     existing.playerID = playerID;
@@ -53,11 +50,7 @@ async function runTick(characterID: string) {
   if (!loop) return;
 
   const session = getPlayerSession(loop.playerID);
-  if (
-    !session ||
-    !session.isPlaying ||
-    session.characterID !== characterID
-  ) {
+  if (!session || !session.isPlaying || session.characterID !== characterID) {
     stopHeartbeatScheduler(characterID);
     return;
   }
@@ -88,10 +81,7 @@ async function runTick(characterID: string) {
     if (character.active_heartbeat_id) {
       const pendingChoice = getChoice(character.active_heartbeat_id);
 
-      if (
-        pendingChoice?.option_a &&
-        pendingChoice?.option_b
-      ) {
+      if (pendingChoice?.option_a && pendingChoice?.option_b) {
         const now = Date.now();
         if (now - loop.lastChoiceReemitAt > 15000) {
           const socketId = playerSocketMap.get(loop.playerID);
@@ -118,12 +108,7 @@ async function runTick(characterID: string) {
       is_deleted: { $ne: true },
     });
 
-    const result = await processHeartbeat(
-      character,
-      sandbox,
-      npcs,
-      loop.playerID
-    );
+    const result = await processHeartbeat(character, sandbox, npcs, loop.playerID);
 
     const socketId = playerSocketMap.get(loop.playerID);
     if (result.isDead) {
@@ -160,7 +145,9 @@ async function runTick(characterID: string) {
 async function advanceDate(sandbox: any) {
   let { current_year: y, current_month: m, current_day: d } = sandbox;
   d += 1;
+
   const daysInMonth = new Date(y, m, 0).getDate();
+
   if (d > daysInMonth) {
     d = 1;
     m += 1;
@@ -174,5 +161,6 @@ async function advanceDate(sandbox: any) {
   sandbox.current_day = d;
   sandbox.last_heartbeat_at = new Date();
   sandbox.heartbeat_count = (sandbox.heartbeat_count || 0) + 1;
+
   await sandbox.save();
 }

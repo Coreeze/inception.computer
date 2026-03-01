@@ -5,10 +5,9 @@ import { ObjectModel } from "../../database/models/object";
 import { Event } from "../../database/models/event";
 import { Places } from "../../database/models/places";
 import { MilestoneEvent, broadcastHeartbeat } from "./heartbeatSubscribers";
-import { StatusPraesens, interpretBeingStats } from "./statusPraesens";
-import { checkSignals } from "./signals";
 import { generateChoices } from "./generateChoices";
 import { formatSimDate } from "../../utils/formatSimDate";
+import { evaluatePlannedAction } from "../plausibility/actionPlausibility";
 
 async function processBeingAction(
   being: IBeing,
@@ -20,9 +19,30 @@ async function processBeingAction(
 ): Promise<void> {
   const actionType = action.action_type || "move";
   const isMain = !!being.is_main;
+  const placeName = (action.place || "").trim();
+
+  if ((action.longitude == null || action.latitude == null) && placeName) {
+    if (isMain) {
+      const knownPlace = await Places.findOne({
+        main_character: character._id,
+        name: placeName,
+      }).select("longitude latitude city country");
+      if (knownPlace) {
+        action.longitude = knownPlace.longitude ?? action.longitude;
+        action.latitude = knownPlace.latitude ?? action.latitude;
+        action.city = action.city || knownPlace.city || undefined;
+        action.country = action.country || knownPlace.country || undefined;
+      }
+    } else {
+      const knownPlace = (being.discovered_places || []).find((p) => (p.name || "").trim().toLowerCase() === placeName.toLowerCase());
+      if (knownPlace) {
+        action.longitude = knownPlace.longitude ?? action.longitude;
+        action.latitude = knownPlace.latitude ?? action.latitude;
+      }
+    }
+  }
 
   if (action.place && action.longitude != null && action.latitude != null) {
-    const placeName = action.place.trim();
     if (placeName) {
       if (isMain) {
         const existing = await Places.findOne({
@@ -30,10 +50,7 @@ async function processBeingAction(
           name: placeName,
         });
         if (!existing) {
-          const description =
-            actionType === "discover_place" && action.discovery_place?.description
-              ? action.discovery_place.description
-              : undefined;
+          const description = actionType === "discover_place" && action.discovery_place?.description ? action.discovery_place.description : undefined;
           try {
             await Places.create({
               user: character.user,
@@ -52,9 +69,7 @@ async function processBeingAction(
         }
       } else {
         const places = being.discovered_places || [];
-        const alreadyKnown = places.some(
-          (p) => p.name?.toLowerCase() === placeName.toLowerCase()
-        );
+        const alreadyKnown = places.some((p) => p.name?.toLowerCase() === placeName.toLowerCase());
         if (!alreadyKnown) {
           places.push({
             name: placeName,
@@ -73,9 +88,7 @@ async function processBeingAction(
     const dpName = (dp.name || action.place || "").trim();
     if (dpName) {
       const places = being.discovered_places || [];
-      const alreadyKnown = places.some(
-        (p) => p.name?.toLowerCase() === dpName.toLowerCase()
-      );
+      const alreadyKnown = places.some((p) => p.name?.toLowerCase() === dpName.toLowerCase());
       if (!alreadyKnown) {
         places.push({
           name: dpName,
@@ -211,7 +224,9 @@ async function processBeingAction(
     if (action.name_change?.last_name) {
       const oldLast = being.last_name || "";
       being.last_name = action.name_change.last_name;
-      being.life_md = (being.life_md || "") + `\n${dateStr}: Changed last name from ${oldLast} to ${action.name_change.last_name} after marriage with ${spouseName}.`;
+      being.life_md =
+        (being.life_md || "") +
+        `\n${dateStr}: Changed last name from ${oldLast} to ${action.name_change.last_name} after marriage with ${spouseName}.`;
     }
 
     if (isMain) {
@@ -336,8 +351,6 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     life_mission: character.life_mission?.progress ?? 0,
   };
 
-  const prevStatus = interpretBeingStats(character);
-
   await broadcastHeartbeat({
     character,
     sandbox,
@@ -374,7 +387,6 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     };
   }
 
-  // const statusPraesens = interpretBeingStats(character);
   // const signals = checkSignals(prevStatus, statusPraesens, sandbox.days_since_last_signal || 0);
 
   // if (signals.length > 0) {
@@ -404,18 +416,27 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
   }
 
   if (charAction && !charAction.is_idle) {
-    await processBeingAction(character, charAction, character, sandbox, npcs, dateStr);
-    character.current_action = charAction.action;
-    character.current_longitude = charAction.longitude ?? character.current_longitude;
-    character.current_latitude = charAction.latitude ?? character.current_latitude;
-    character.current_place = charAction.place;
-    character.current_city = charAction.city;
-    character.current_country = charAction.country;
-    character.current_action_updated_at = new Date();
-    const actionType = charAction.action_type || "move";
-    if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
-      const place = charAction.place ? ` at ${charAction.place}` : "";
-      character.life_md = (character.life_md || "") + `\n${dateStr}: ${charAction.action}${place}`;
+    const decision = evaluatePlannedAction(character, charAction, sandbox);
+    if (decision.allow) {
+      const executable = decision.action;
+      await processBeingAction(character, executable, character, sandbox, npcs, dateStr);
+      character.current_action = executable.action;
+      character.current_longitude = executable.longitude ?? character.current_longitude;
+      character.current_latitude = executable.latitude ?? character.current_latitude;
+      character.current_place = executable.place;
+      character.current_city = executable.city;
+      character.current_country = executable.country;
+      character.current_action_updated_at = new Date();
+      const actionType = executable.action_type || "move";
+      if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
+        const place = executable.place ? ` at ${executable.place}` : "";
+        character.life_md = (character.life_md || "") + `\n${dateStr}: ${executable.action}${place}`;
+      }
+    } else {
+      console.info("[plausibility] skipped main action", {
+        actorId: character._id?.toString(),
+        reason: decision.reason,
+      });
     }
   } else if (!charAction) {
     character.current_action = undefined;
@@ -426,17 +447,26 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     if (npc.ai_action_queue?.length) {
       const action = npc.ai_action_queue.shift() as IPlannedAction | undefined;
       if (action) {
-        await processBeingAction(npc, action, character, sandbox, npcs, dateStr);
-        npc.current_action = action.action;
-        npc.current_longitude = action.longitude ?? npc.current_longitude;
-        npc.current_latitude = action.latitude ?? npc.current_latitude;
-        npc.current_place = action.place;
-        npc.current_city = action.city;
-        npc.current_country = action.country;
-        const actionType = action.action_type || "move";
-        if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
-          const place = action.place ? ` at ${action.place}` : "";
-          npc.life_md = (npc.life_md || "") + `\n${dateStr}: ${action.action}${place}`;
+        const decision = evaluatePlannedAction(npc, action, sandbox);
+        if (decision.allow) {
+          const executable = decision.action;
+          await processBeingAction(npc, executable, character, sandbox, npcs, dateStr);
+          npc.current_action = executable.action;
+          npc.current_longitude = executable.longitude ?? npc.current_longitude;
+          npc.current_latitude = executable.latitude ?? npc.current_latitude;
+          npc.current_place = executable.place;
+          npc.current_city = executable.city;
+          npc.current_country = executable.country;
+          const actionType = executable.action_type || "move";
+          if (!["marry", "child_birth", "adopt_pet", "change_occupation"].includes(actionType)) {
+            const place = executable.place ? ` at ${executable.place}` : "";
+            npc.life_md = (npc.life_md || "") + `\n${dateStr}: ${executable.action}${place}`;
+          }
+        } else {
+          console.info("[plausibility] skipped npc action", {
+            actorId: npc._id?.toString(),
+            reason: decision.reason,
+          });
         }
       }
     }

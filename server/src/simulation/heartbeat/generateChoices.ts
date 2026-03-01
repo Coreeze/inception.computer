@@ -2,10 +2,25 @@ import { ObjectId } from "mongodb";
 import { IBeing } from "../../database/models/being";
 import { ISandboxDocument } from "../../database/models/sandbox";
 import { setChoice } from "./choiceStore";
-import { Signal } from "./signals";
-import { StatusPraesens } from "./statusPraesens";
 import { completeJSON } from "../../services/ai/openrouter";
 import { io, playerSocketMap } from "../../index";
+
+export interface Signal {
+  type: string;
+  payload: Record<string, any>;
+  priority: number;
+}
+
+export interface StatusEntry {
+  label: string;
+  description: string;
+}
+
+export interface StatusPraesens {
+  health: StatusEntry;
+  vibe: StatusEntry;
+  life_mission: StatusEntry;
+}
 
 interface GenerateChoicesParams {
   character: IBeing;
@@ -16,22 +31,13 @@ interface GenerateChoicesParams {
   userID: string;
 }
 
-export async function generateChoices({
-  character,
-  sandbox,
-  signals,
-  statusPraesens,
-  heartbeatId,
-  userID,
-}: GenerateChoicesParams): Promise<void> {
+export async function generateChoices({ character, sandbox, signals, statusPraesens, heartbeatId, userID }: GenerateChoicesParams): Promise<void> {
   try {
     character.active_heartbeat_id = heartbeatId;
     character.is_processing = true;
     await character.save();
 
-    const signalDescriptions = signals
-      .map((s) => `${s.type}: ${JSON.stringify(s.payload)}`)
-      .join("; ");
+    const signalDescriptions = signals.map((s) => `${s.type}: ${JSON.stringify(s.payload)}`).join("; ");
 
     const prompt = `You are generating life choices for a character in a life simulation.
 

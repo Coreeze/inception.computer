@@ -61,6 +61,37 @@ interface BatchPlanEntry {
   actions: WeeklyPlanAction[];
 }
 
+const COMPRESSED_PLANNER_CONSTITUTION = `
+- Simulate persistent real life: world state accumulates; no disposable entities.
+- If an action references a non-existing person/place/entity/business/relationship, create it (after dedupe).
+- Dedupe by normalized identity + geo proximity + recent-time window + relationship context.
+- Main-character interactions: create first-class records immediately.
+- NPC interactions: persist metadata at minimum; materialize full records when simulation requires.
+- Behavior must follow human drives: belonging, safety, status, purpose, resources.
+- Use neuroscience balance: attachment, reward prediction, stress regulation, habit loops, social homeostasis.
+- Discoveries are natural and uncapped when context supports them; avoid artificial numeric limits.
+- Relationships evolve gradually; include social network effects (introductions, trust, reputation, conflict, repair).
+- Economic life must be plausible: earn/spend/save/borrow/invest/build/close businesses under constraints.
+- Major transitions require plausibility checks: temporal, geographic, social-psychological, economic, life-stage.
+- Prefer plausible adaptation over invalid jumps; if implausible, pivot to nearest valid action.
+- Maintain continuity and inertia; no abrupt identity/personality oscillations without triggers.
+- Failures should produce adaptive follow-up (retry/pivot/defer/help), not repetitive loops.
+- Log major transitions deterministically with provenance (who/what/where/why/when/source).
+- Output strict schema-valid JSON only; never emit malformed required fields.
+`.trim();
+
+const KNOWN_ACTION_TYPES = new Set([
+  "move",
+  "discover_place",
+  "discover_person",
+  "buy",
+  "event",
+  "marry",
+  "child_birth",
+  "adopt_pet",
+  "change_occupation",
+]);
+
 function parseNumeric(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -76,6 +107,91 @@ function clampNumber(value: unknown, min: number, max: number): number | undefin
   const parsed = parseNumeric(value);
   if (parsed == null) return undefined;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function sanitizeText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const v = value.trim();
+  return v.length > 0 ? v : undefined;
+}
+
+function sanitizeWeeklyAction(action: WeeklyPlanAction): WeeklyPlanAction | null {
+  const actionText = sanitizeText(action.action);
+  const reason = sanitizeText(action.reason);
+  const place = sanitizeText(action.place);
+
+  if (!actionText || !reason || !place) return null;
+
+  const actionType = KNOWN_ACTION_TYPES.has(action.action_type || "move") ? action.action_type || "move" : "move";
+  const normalized: WeeklyPlanAction = {
+    ...action,
+    action: actionText,
+    reason,
+    place,
+    city: sanitizeText(action.city) || "Unknown",
+    country: sanitizeText(action.country) || "Unknown",
+    longitude: clampNumber(action.longitude, -180, 180) ?? 0,
+    latitude: clampNumber(action.latitude, -90, 90) ?? 0,
+    action_type: actionType,
+  };
+
+  if (actionType === "discover_place") {
+    const discoveryPlaceName = sanitizeText(action.discovery_place?.name) || place;
+    if (!discoveryPlaceName) return null;
+    normalized.discovery_place = {
+      name: discoveryPlaceName,
+      description: sanitizeText(action.discovery_place?.description),
+      latitude: clampNumber(action.discovery_place?.latitude, -90, 90) ?? normalized.latitude,
+      longitude: clampNumber(action.discovery_place?.longitude, -180, 180) ?? normalized.longitude,
+    };
+  }
+
+  if (actionType === "discover_person") {
+    const firstName = sanitizeText(action.discovery_person?.first_name);
+    if (!firstName) return null;
+    normalized.discovery_person = {
+      first_name: firstName,
+      last_name: sanitizeText(action.discovery_person?.last_name),
+      description: sanitizeText(action.discovery_person?.description),
+      occupation: sanitizeText(action.discovery_person?.occupation),
+    };
+  }
+
+  if (actionType === "adopt_pet" && action.pet) {
+    const species = sanitizeText(action.pet.species);
+    if (!species) return null;
+    normalized.pet = {
+      species,
+      name: sanitizeText(action.pet.name),
+      acquisition_mode: action.pet.acquisition_mode || "adopt",
+    };
+  }
+
+  if (actionType === "change_occupation") {
+    const nextOccupation = sanitizeText(action.occupation_change?.occupation);
+    if (!nextOccupation) return null;
+    normalized.occupation_change = { occupation: nextOccupation };
+  }
+
+  if (actionType === "marry") {
+    const spouseName = sanitizeText(action.family_membership?.spouse_name);
+    if (!spouseName) return null;
+    normalized.family_membership = { ...(normalized.family_membership || {}), spouse_name: spouseName };
+    normalized.relationship_event = "marriage";
+  }
+
+  if (actionType === "child_birth") {
+    const childName = sanitizeText(action.family_membership?.child_name);
+    if (!childName) return null;
+    normalized.family_membership = { ...(normalized.family_membership || {}), child_name: childName };
+    normalized.relationship_event = "child_birth";
+  }
+
+  return normalized;
+}
+
+function sanitizeWeeklyActions(actions: WeeklyPlanAction[] | undefined): WeeklyPlanAction[] {
+  return (actions || []).map((a) => sanitizeWeeklyAction(a)).filter((a): a is WeeklyPlanAction => !!a);
 }
 
 function compactSandboxContext(sandboxContext: any): any {
@@ -193,6 +309,9 @@ ${JSON.stringify(npcRoster)}
 Generate exactly 7 daily actions for each NPC below:
 ${JSON.stringify(npcDetails)}
 
+PLANNER CONSTITUTION:
+${COMPRESSED_PLANNER_CONSTITUTION}
+
 NEUROSCIENCE-INSPIRED DECISION MODEL:
 Balance these drives when choosing each action:
 - Attachment: bonding, caregiving, belonging needs
@@ -276,7 +395,7 @@ Return minified JSON (single line).`;
     const npc = npcs.find((n) => n._id.toString() === entry.npc_id);
     if (!npc) continue;
     const otherNpcs = npcs.filter((n) => !n._id.equals(npc._id));
-    const planned = (entry.actions || []).map((a) => toPlannedAction(a, sandbox, otherNpcs));
+    const planned = sanitizeWeeklyActions(entry.actions).map((a) => toPlannedAction(a, sandbox, otherNpcs));
     actionsByNpc.set(npc._id.toString(), planned);
   }
 
@@ -328,6 +447,9 @@ ${npcList}
 
 DATE: ${sandbox.current_month}/${sandbox.current_day}/${sandbox.current_year}
 
+PLANNER CONSTITUTION:
+${COMPRESSED_PLANNER_CONSTITUTION}
+
 NEUROSCIENCE-INSPIRED DECISION MODEL:
 Balance these drives when choosing each action:
 - Attachment: bonding, caregiving, belonging needs
@@ -374,7 +496,7 @@ Return minified JSON (single line).`;
     userPrompt: prompt,
   });
 
-  return (response.actions || []).map((a) => toPlannedAction(a, sandbox, otherNpcs));
+  return sanitizeWeeklyActions(response.actions).map((a) => toPlannedAction(a, sandbox, otherNpcs));
 }
 
 export async function generateAllNPCPlans({ sandbox }: { sandbox: ISandboxDocument }): Promise<IBeing[]> {

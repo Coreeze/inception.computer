@@ -54,6 +54,7 @@ export const initializeEndpoint = async (req: Request, res: Response) => {
       current_day: 1,
       day_duration_ms: 2000,
       currency: currency,
+      free_will_enabled: true,
     });
 
     const character = await Being.create({
