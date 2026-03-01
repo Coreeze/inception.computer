@@ -110,6 +110,12 @@ export default function WorldLayout({
       if (data?.npcUpdates) {
         useWorldStorage.getState().applyNPCUpdates(data.npcUpdates);
       }
+      if (data?.newNpcs?.length) {
+        useWorldStorage.getState().addNpcs(data.newNpcs);
+      }
+      if (data?.newPlaces?.length) {
+        useWorldStorage.getState().addMapPlaces(data.newPlaces);
+      }
     };
 
     const handleRuntimeStatus = (data: any) => {

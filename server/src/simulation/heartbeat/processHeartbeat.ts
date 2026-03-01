@@ -9,13 +9,19 @@ import { generateChoices } from "./generateChoices";
 import { formatSimDate } from "../../utils/formatSimDate";
 import { evaluatePlannedAction } from "../plausibility/actionPlausibility";
 
+interface EntityCollector {
+  newNpcs: any[];
+  newPlaces: any[];
+}
+
 async function processBeingAction(
   being: IBeing,
   action: IPlannedAction,
   character: IBeing,
   sandbox: ISandboxDocument,
   npcs: IBeing[],
-  dateStr: string
+  dateStr: string,
+  collector: EntityCollector
 ): Promise<void> {
   const actionType = action.action_type || "move";
   const isMain = !!being.is_main;
@@ -50,7 +56,7 @@ async function processBeingAction(
       const existing = await Places.findOne({ main_character: character._id, name: placeName });
       if (!existing) {
         try {
-          await Places.create({
+          const created = await Places.create({
             user: character.user,
             sandbox: sandbox._id,
             main_character: character._id,
@@ -62,6 +68,7 @@ async function processBeingAction(
             introduced_via: "exploration",
             introduced_by: being._id,
           });
+          collector.newPlaces.push(created);
         } catch {}
       }
     } else {
@@ -81,7 +88,7 @@ async function processBeingAction(
       const existing = await Places.findOne({ main_character: character._id, name: apName });
       if (!existing) {
         try {
-          await Places.create({
+          const created = await Places.create({
             user: character.user,
             sandbox: sandbox._id,
             main_character: character._id,
@@ -94,6 +101,7 @@ async function processBeingAction(
             introduced_via: "exploration",
             introduced_by: being._id,
           });
+          collector.newPlaces.push(created);
         } catch {}
       }
     } else {
@@ -137,7 +145,7 @@ async function processBeingAction(
       });
       if (!existing) {
         try {
-          await Being.create({
+          const created = await Being.create({
             user: character.user,
             sandbox: sandbox._id,
             species: "human",
@@ -158,6 +166,7 @@ async function processBeingAction(
             current_country: action.country,
             relationship_to_main_character: "acquaintance",
           });
+          collector.newNpcs.push(created);
         } catch {}
       }
     }
@@ -210,7 +219,7 @@ async function processBeingAction(
     const pet = action.pet;
     if (isMain) {
       try {
-        await Being.create({
+        const created = await Being.create({
           user: character.user,
           sandbox: sandbox._id,
           species: pet.species || "animal",
@@ -225,6 +234,7 @@ async function processBeingAction(
           current_longitude: being.current_longitude,
           current_latitude: being.current_latitude,
         });
+        collector.newNpcs.push(created);
       } catch {}
     }
     being.life_md = (being.life_md || "") + `\n${dateStr}: Adopted ${pet.name || pet.species} (${pet.species}).`;
@@ -250,7 +260,7 @@ async function processBeingAction(
       });
       if (!existing) {
         try {
-          await Being.create({
+          const created = await Being.create({
             user: character.user,
             sandbox: sandbox._id,
             species: "human",
@@ -268,6 +278,7 @@ async function processBeingAction(
             current_longitude: being.current_longitude,
             current_latitude: being.current_latitude,
           });
+          collector.newNpcs.push(created);
         } catch {}
       }
     }
@@ -279,7 +290,7 @@ async function processBeingAction(
 
     if (isMain) {
       try {
-        await Being.create({
+        const created = await Being.create({
           user: character.user,
           sandbox: sandbox._id,
           species: "human",
@@ -299,6 +310,7 @@ async function processBeingAction(
           current_longitude: being.current_longitude,
           current_latitude: being.current_latitude,
         });
+        collector.newNpcs.push(created);
       } catch {}
     }
   }
@@ -353,6 +365,8 @@ export interface HeartbeatResult {
     image_url?: string;
   };
   npcUpdates: NPCUpdate[];
+  newNpcs: any[];
+  newPlaces: any[];
 }
 
 export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocument, npcs: IBeing[], userID: string): Promise<HeartbeatResult> {
@@ -402,6 +416,8 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
         image_url: character.image_url,
       },
       npcUpdates: [],
+      newNpcs: [],
+      newPlaces: [],
     };
   }
 
@@ -425,6 +441,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
   // }
 
   const dateStr = formatSimDate(sandbox.current_year, sandbox.current_month, sandbox.current_day);
+  const collector: EntityCollector = { newNpcs: [], newPlaces: [] };
 
   let charAction: IPlannedAction | undefined;
   if (character.player_action_queue?.length) {
@@ -439,7 +456,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
     const decision = evaluatePlannedAction(character, charAction, sandbox);
     if (decision.allow) {
       const executable = decision.action;
-      await processBeingAction(character, executable, character, sandbox, npcs, dateStr);
+      await processBeingAction(character, executable, character, sandbox, npcs, dateStr, collector);
       character.current_action = executable.action;
       character.current_longitude = executable.longitude ?? character.current_longitude;
       character.current_latitude = executable.latitude ?? character.current_latitude;
@@ -471,7 +488,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
         const decision = evaluatePlannedAction(npc, action, sandbox);
         if (decision.allow) {
           const executable = decision.action;
-          await processBeingAction(npc, executable, character, sandbox, npcs, dateStr);
+          await processBeingAction(npc, executable, character, sandbox, npcs, dateStr, collector);
           npc.current_action = executable.action;
           npc.current_longitude = executable.longitude ?? npc.current_longitude;
           npc.current_latitude = executable.latitude ?? npc.current_latitude;
@@ -545,5 +562,7 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
       image_url: character.image_url,
     },
     npcUpdates,
+    newNpcs: collector.newNpcs,
+    newPlaces: collector.newPlaces,
   };
 }

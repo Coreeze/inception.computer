@@ -90,6 +90,8 @@ interface WorldState {
   mapPlaces: MapPlace[];
   setMapPlaces: (places: MapPlace[]) => void;
   addMapPlace: (place: MapPlace) => void;
+  addNpcs: (newNpcs: IBeing[]) => void;
+  addMapPlaces: (newPlaces: MapPlace[]) => void;
   updateBeingImage: (beingID: string, imageURL: string) => void;
   updatePlaceImage: (placeID: string, imageURL: string) => void;
 }
@@ -227,6 +229,18 @@ const useWorldStorage = create<WorldState>()(
             place,
           ],
         })),
+      addNpcs: (newNpcs) =>
+        set((state) => {
+          const existingIds = new Set(state.npcs.map((n) => n._id));
+          const unique = newNpcs.filter((n) => !existingIds.has(n._id));
+          return unique.length ? { npcs: [...state.npcs, ...unique] } : {};
+        }),
+      addMapPlaces: (newPlaces) =>
+        set((state) => {
+          const existingIds = new Set(state.mapPlaces.map((p) => p._id));
+          const unique = newPlaces.filter((p) => !existingIds.has(p._id));
+          return unique.length ? { mapPlaces: [...state.mapPlaces, ...unique] } : {};
+        }),
       updateBeingImage: (beingID, imageURL) =>
         set((state) => ({
           character:

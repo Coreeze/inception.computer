@@ -129,6 +129,8 @@ async function runTick(characterID: string) {
         stats: result.stats,
         characterAction: result.characterAction,
         npcUpdates: result.npcUpdates,
+        newNpcs: result.newNpcs,
+        newPlaces: result.newPlaces,
       });
     }
   } catch (error) {

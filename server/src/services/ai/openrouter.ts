@@ -6,12 +6,9 @@ const openrouter = new OpenAI({
 });
 
 export const MODELS = {
-  // fast: "mistralai/mistral-small-3.1-24b-instruct",
-  fast: "google/gemini-2.5-flash",
-  // smart: "mistralai/mistral-medium-3.1",
-  smart: "google/gemini-2.5-flash",
-  // reasoning: "mistralai/mistral-large-2411",
-  reasoning: "google/gemini-2.5-flash",
+  fast: "mistralai/ministral-14b-instruct-2512",
+  smart: "mistralai/ministral-14b-instruct-2512",
+  reasoning: "mistralai/ministral-14b-instruct-2512",
 } as const;
 
 type ModelTier = keyof typeof MODELS;

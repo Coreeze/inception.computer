@@ -1163,7 +1163,7 @@
         font-size: 0.5rem;
         letter-spacing: 0.2em;
         text-transform: uppercase;
-        color: var(--faint);
+        color: var(--dim);
         margin-bottom: 0.3rem;
       }
       .stack-item-value {
@@ -1326,13 +1326,43 @@
         <p class="hero-subline" style="color: #000000; background-color: red">what can go wrong?</p>
         <div class="hero-author">Cris Lenta</div>
         <div class="hero-event">Mistral AI Worldwide Hackathon · February 28 – March 1, 2026</div>
-        <nav class="chapter-nav" style="color: rede; background-color: black">
+        <nav class="chapter-nav" style="color: red; background-color: black">
           <a href="#thesis" style="text-decoration: underline">The Thesis</a>
           <a href="#neuroscience" style="text-decoration: underline">Neuroscience</a>
           <a href="#sociology" style="text-decoration: underline">Sociology</a>
           <a href="#psychology" style="text-decoration: underline">Psychology</a>
           <a href="#emergent" style="text-decoration: underline">Emergent Behavior</a>
         </nav>
+      </section>
+
+      <!-- ===== STACK ===== -->
+      <section class="stack-bar">
+        <div class="stack-row reveal">
+          <div class="stack-item">
+            <div class="stack-item-label">Intelligence</div>
+            <div class="stack-item-value">Ministral 14B</div>
+          </div>
+          <div class="stack-item">
+            <div class="stack-item-label">Inference</div>
+            <div class="stack-item-value">NVIDIA Brev H100</div>
+          </div>
+          <div class="stack-item">
+            <div class="stack-item-label">Runtime</div>
+            <div class="stack-item-value">Socket.IO</div>
+          </div>
+          <div class="stack-item">
+            <div class="stack-item-label">World</div>
+            <div class="stack-item-value">Mapbox GL</div>
+          </div>
+          <div class="stack-item">
+            <div class="stack-item-label">Vision</div>
+            <div class="stack-item-value">Fal.ai (Flux)</div>
+          </div>
+          <div class="stack-item">
+            <div class="stack-item-label">Agents</div>
+            <div class="stack-item-value">Autonomous</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══════════════════════════════════════════ -->
@@ -1482,8 +1512,8 @@
               <div class="compare-item">
                 <div class="compare-name hl">INCEPTION (2026)</div>
                 <div class="compare-desc">real cities, real coordinates</div>
-                <div class="compare-desc">Mistral 14B on NVIDIA Brev L40s</div>
-                <div class="compare-desc">persistent ElevenLabs voice</div>
+                <div class="compare-desc">Ministral 14B on NVIDIA H100</div>
+                <div class="compare-desc">persistent text-native social simulation</div>
                 <div class="compare-desc">neuroscience · sociology · psychology</div>
               </div>
             </div>
@@ -1501,8 +1531,8 @@
           <div class="section-subtitle reveal">Neuroscience of Artificial Minds</div>
 
           <p class="reveal">
-            The INCEPTION engine transforms a Mistral language model into a complete cognitive architecture — not a chatbot wrapper, not a prompt
-            chain. Each subsystem maps to a specific neural circuit described in the literature.
+            The INCEPTION engine transforms Ministral 14B into a complete cognitive architecture — not a chatbot wrapper, not a prompt chain. Each
+            subsystem maps to a specific neural circuit described in the literature.
           </p>
 
           <p class="reveal">
@@ -1551,7 +1581,7 @@
             thresholds, behavior shifts. The agent doesn't need to be told it's stressed; stress emerges from accumulated load.
           </p>
 
-          <div class="cli-box reveal"><span class="prompt">$</span> inception --city paris --agents 4 --model mistral-14b --brev-l40s</div>
+          <div class="cli-box reveal"><span class="prompt">$</span> inception --city paris --agents 4 --model ministral-14b --brev-h100</div>
         </div>
         <div class="col-right">
           <div class="pixel-illustration reveal" style="margin-top: 3rem">
@@ -1629,9 +1659,9 @@
             <div class="lb-arrow">↻</div>
             <div class="lb-stack">
               <div><span>grounded on:</span> Mapbox GL (real coordinates)</div>
-              <div><span>voiced by:</span> ElevenLabs</div>
-              <div><span>powered by:</span> Mistral 14B</div>
-              <div><span>inference:</span> NVIDIA Brev L40s</div>
+              <div><span>vision:</span> Fal.ai (Flux)</div>
+              <div><span>powered by:</span> Ministral 14B on NVIDIA Brev H100</div>
+              <div><span>runtime:</span> Socket.IO + MongoDB</div>
             </div>
           </div>
         </div>
@@ -2014,7 +2044,7 @@
               </div>
               <br />
               <div class="t-dim">agents: 4 alive · world time: 16:22</div>
-              <div class="t-dim">model: mistral-14b · inference: brev l40s</div>
+              <div class="t-dim">model: ministral-14b · inference: brev h100</div>
             </div>
           </div>
 
@@ -2067,15 +2097,15 @@
         <div class="stack-row reveal">
           <div class="stack-item">
             <div class="stack-item-label">Intelligence</div>
-            <div class="stack-item-value">Mistral 14B</div>
+            <div class="stack-item-value">Ministral 14B</div>
           </div>
           <div class="stack-item">
             <div class="stack-item-label">Inference</div>
-            <div class="stack-item-value">NVIDIA Brev L40s</div>
+            <div class="stack-item-value">NVIDIA Brev H100</div>
           </div>
           <div class="stack-item">
-            <div class="stack-item-label">Voice</div>
-            <div class="stack-item-value">ElevenLabs</div>
+            <div class="stack-item-label">Runtime</div>
+            <div class="stack-item-value">Socket.IO</div>
           </div>
           <div class="stack-item">
             <div class="stack-item-label">World</div>
@@ -2091,6 +2121,55 @@
           </div>
         </div>
       </section>
+
+      <!-- ===== FUTURE WORK ===== -->
+      <div class="sp-lg" id="future-work"></div>
+      <div class="two-col">
+        <div class="col-left prose">
+          <h2 class="section-title reveal">Future Work</h2>
+          <div class="section-subtitle reveal">From Individuals to Populations</div>
+
+          <p class="reveal">
+            Individuals and crowds follow different dynamics. Crowd behavior is not simply many single-agent behaviors added together — it exhibits
+            phase transitions, emergent norms, and statistical regularities that individual models cannot capture by summation alone.
+          </p>
+
+          <p class="reveal">
+            <span class="feat">One Model, One Population</span> — The next step is to model a statistically meaningful population distribution — age,
+            work patterns, mobility, social ties — and simulate it with a single fine-tuned LLM as the behavioral prior. The hypothesis: one
+            calibrated model can generate realistic mass-level patterns while preserving person-level heterogeneity through conditioning.
+          </p>
+
+          <p class="reveal">
+            <span class="feat">Validation Against Reality</span> — Validate against real aggregate signals: mobility flows, encounter rates, sentiment
+            diffusion curves, event participation distributions. If validated, this enables city-scale social simulation on a single GPU with
+            controllable fidelity.
+          </p>
+
+          <p class="dim reveal">
+            The architecture already separates identity (soul_md) from behavior (planner + heartbeat). Swapping individual planning for
+            population-conditioned sampling requires no structural change — only a different inference strategy.
+          </p>
+        </div>
+        <div class="col-right">
+          <div class="compare-box reveal" style="margin-top: 4rem">
+            <div class="compare-label">Scale Trajectory</div>
+            <div class="compare-item">
+              <div class="compare-name">Today</div>
+              <div class="compare-desc">4–20 agents, individual LLM planning</div>
+              <div class="compare-desc">per-agent cognitive loop</div>
+              <div class="compare-desc">emergent social dynamics</div>
+            </div>
+            <div class="compare-arrow">↓</div>
+            <div class="compare-item">
+              <div class="compare-name hl">Next</div>
+              <div class="compare-desc">1,000+ agents via population prior</div>
+              <div class="compare-desc">one fine-tuned model, conditioned sampling</div>
+              <div class="compare-desc">validated against aggregate urban data</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ===== FOOTER ===== -->
       <section class="footer">
