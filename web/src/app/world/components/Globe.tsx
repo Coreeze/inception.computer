@@ -274,7 +274,19 @@ export default function Globe() {
   useEffect(() => {
     if (!map.current || !mapLoaded || !character) return;
 
-    const characterPopup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+    if (characterMarker.current) {
+      characterMarker.current.remove();
+      characterMarker.current = null;
+    }
+
+    const el = createAvatarMarkerElement(
+      character.image_url,
+      "#ff1a1a",
+      `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
+    );
+    el.className = "character-marker";
+
+    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
       <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
         <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
           ${buildPopupAvatarHTML(
@@ -292,31 +304,10 @@ export default function Globe() {
       </div>
     `);
 
-    if (!characterMarker.current) {
-      const el = createAvatarMarkerElement(
-        character.image_url,
-        "#ff1a1a",
-        `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
-      );
-      el.className = "character-marker";
-
-      characterMarker.current = new mapboxgl.Marker({ element: el })
-        .setLngLat([character.current_longitude, character.current_latitude])
-        .setPopup(characterPopup)
-        .addTo(map.current);
-    } else {
-      const markerEl = characterMarker.current.getElement();
-      markerEl.innerHTML = "";
-      const updated = createAvatarMarkerElement(
-        character.image_url,
-        "#ff1a1a",
-        `${character.first_name || "Character"} ${character.last_name || ""}`.trim()
-      );
-      markerEl.classList.add("character-marker");
-      markerEl.innerHTML = updated.innerHTML;
-      characterMarker.current.setLngLat([character.current_longitude, character.current_latitude]);
-      characterMarker.current.setPopup(characterPopup);
-    }
+    characterMarker.current = new mapboxgl.Marker({ element: el })
+      .setLngLat([character.current_longitude, character.current_latitude])
+      .setPopup(popup)
+      .addTo(map.current);
   }, [character, mapLoaded]);
 
   useEffect(() => {
@@ -335,64 +326,37 @@ export default function Globe() {
 
       const existing = npcMarkers.current.get(npc._id);
       if (existing) {
-        const markerEl = existing.getElement();
-        markerEl.innerHTML = "";
-        const updated = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
-        markerEl.classList.add("npc-marker");
-        markerEl.innerHTML = updated.innerHTML;
-        existing.setLngLat([npc.current_longitude, npc.current_latitude]);
-        existing.setPopup(
-          new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
-                <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
-                  ${buildPopupAvatarHTML(
-                    npc.image_url,
-                    `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
-                    buildGenerateImageButtonHTML(npc._id, false, npc.image_url)
-                  )}
-                </div>
-                <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
-                <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
-                <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
-                <button data-open-profile data-npc-id="${
-                  npc._id
-                }" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
-                  View profile
-                </button>
-              </div>
-            `)
-        );
-      } else {
-        const el = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
-        el.classList.add("npc-marker");
-
-        const marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([npc.current_longitude, npc.current_latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(`
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
-                <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
-                  ${buildPopupAvatarHTML(
-                    npc.image_url,
-                    `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
-                    buildGenerateImageButtonHTML(npc._id, false, npc.image_url)
-                  )}
-                </div>
-                <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
-                <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
-                <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
-                <button data-open-profile data-npc-id="${
-                  npc._id
-                }" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
-                  View profile
-                </button>
-              </div>
-            `)
-          )
-          .addTo(map.current!);
-
-        npcMarkers.current.set(npc._id, marker);
+        existing.remove();
+        npcMarkers.current.delete(npc._id);
       }
+
+      const el = createAvatarMarkerElement(npc.image_url, "#d1cbc3", `${npc.first_name || "NPC"} ${npc.last_name || ""}`.trim());
+      el.classList.add("npc-marker");
+
+      const npcPopupHTML = `
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1a1714;">
+          <div style="width:126px;height:224px;border-radius:8px;overflow:hidden;border:1px solid #d1cbc3;margin-bottom:8px;">
+            ${buildPopupAvatarHTML(
+              npc.image_url,
+              `${npc.first_name || ""} ${npc.last_name || ""}`.trim(),
+              buildGenerateImageButtonHTML(npc._id, false, npc.image_url)
+            )}
+          </div>
+          <span style="color: #7a756d;">${npc.occupation || "Unknown occupation"}</span><br/>
+          <strong>${(npc.first_name || "") + " " + (npc.last_name || "")}</strong><br/>
+          <span style="color: #7a756d;">${npc.current_action || "idle"}</span>
+          <button data-open-profile data-npc-id="${npc._id}" style="display:block;margin-top:8px;padding:4px 8px;border:1px solid #d1cbc3;border-radius:6px;background:#f9f7f3;cursor:pointer;font-size:11px;font-family:inherit;">
+            View profile
+          </button>
+        </div>
+      `;
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([npc.current_longitude, npc.current_latitude])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(npcPopupHTML))
+        .addTo(map.current!);
+
+      npcMarkers.current.set(npc._id, marker);
     }
   }, [npcs, mapLoaded]);
 

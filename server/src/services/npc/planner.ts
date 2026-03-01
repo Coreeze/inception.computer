@@ -88,8 +88,7 @@ const COMPRESSED_PLANNER_CONSTITUTION = `
 - Output strict schema-valid JSON only; never emit malformed required fields.
 `.trim();
 
-const PLANNER_SYSTEM_PROMPT =
-  "You generate realistic weekly plans for beings in a life simulation. Return strict schema-valid JSON only.";
+const PLANNER_SYSTEM_PROMPT = "You generate realistic weekly plans for beings in a life simulation. Return strict schema-valid JSON only.";
 
 const ACTION_RULES_BLOCK = `Rules for each action:
 1. Be realistic for personality, occupation, and life stage
@@ -504,13 +503,7 @@ async function generateNPCWeeklyPlan({
   });
 }
 
-export async function generateAllNPCPlans({
-  sandbox,
-  mainCharacter,
-}: {
-  sandbox: ISandboxDocument;
-  mainCharacter?: IBeing;
-}): Promise<IBeing[]> {
+export async function generateAllNPCPlans({ sandbox, mainCharacter }: { sandbox: ISandboxDocument; mainCharacter?: IBeing }): Promise<IBeing[]> {
   const npcs = await Being.find({
     sandbox: sandbox._id,
     is_main: { $ne: true },
@@ -539,6 +532,7 @@ export async function generateAllNPCPlans({
           sandbox,
           otherNpcs: npcs,
         });
+        console.log("Main character actions:", mainActions);
         const existingQueue = mainCharacterDoc.ai_action_queue || [];
         const updatedQueue = [...mainActions, ...existingQueue].slice(0, MAX_AI_QUEUE_SIZE);
         mainCharacterDoc.ai_action_queue = updatedQueue;

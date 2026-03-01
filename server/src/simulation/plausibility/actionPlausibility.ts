@@ -22,13 +22,16 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function normalizeBase(action: IPlannedAction): IPlannedAction {
+  const plain = typeof (action as any).toObject === "function" ? (action as any).toObject() : action;
   const normalized: IPlannedAction = {
-    ...action,
-    action: (action.action || "").trim(),
-    reason: (action.reason || "").trim(),
-    place: (action.place || "").trim() || undefined,
-    city: (action.city || "").trim() || undefined,
-    country: (action.country || "").trim() || undefined,
+    ...plain,
+    action: (plain.action || "").trim(),
+    reason: (plain.reason || "").trim(),
+    place: (plain.place || "").trim() || undefined,
+    city: (plain.city || "").trim() || undefined,
+    country: (plain.country || "").trim() || undefined,
+    longitude: plain.longitude,
+    latitude: plain.latitude,
   };
 
   if (typeof normalized.longitude === "number") normalized.longitude = clamp(normalized.longitude, -180, 180);

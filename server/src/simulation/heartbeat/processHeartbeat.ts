@@ -412,9 +412,11 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
 
   let charAction: IPlannedAction | undefined;
   if (character.player_action_queue?.length) {
-    charAction = character.player_action_queue.shift();
+    const raw = character.player_action_queue.shift();
+    charAction = raw && typeof (raw as any).toObject === "function" ? (raw as any).toObject() : raw;
   } else if (sandbox.free_will_enabled && character.ai_action_queue?.length) {
-    charAction = character.ai_action_queue.shift() as IPlannedAction | undefined;
+    const raw = character.ai_action_queue.shift();
+    charAction = raw && typeof (raw as any).toObject === "function" ? (raw as any).toObject() : raw;
   }
 
   if (charAction && !charAction.is_idle) {
@@ -447,7 +449,8 @@ export async function processHeartbeat(character: IBeing, sandbox: ISandboxDocum
   const npcUpdates: NPCUpdate[] = [];
   for (const npc of npcs) {
     if (npc.ai_action_queue?.length) {
-      const action = npc.ai_action_queue.shift() as IPlannedAction | undefined;
+      const rawNpcAction = npc.ai_action_queue.shift();
+      const action: IPlannedAction | undefined = rawNpcAction && typeof (rawNpcAction as any).toObject === "function" ? (rawNpcAction as any).toObject() : (rawNpcAction as IPlannedAction | undefined);
       if (action) {
         const decision = evaluatePlannedAction(npc, action, sandbox);
         if (decision.allow) {
